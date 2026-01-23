@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useCoralStore } from '../../stores/coralStore'
 import { useLightStore } from '../../stores/lightStore'
@@ -41,16 +42,16 @@ function createMushroomGeometry(): THREE.BufferGeometry {
   // Add organic waviness to the cap
   const capPositions = capGeo.attributes.position
   for (let i = 0; i < capPositions.count; i++) {
-    let x = capPositions.getX(i)
-    let y = capPositions.getY(i)
-    let z = capPositions.getZ(i)
+    const x = capPositions.getX(i)
+    const origY = capPositions.getY(i)
+    const z = capPositions.getZ(i)
 
     const angle = Math.atan2(z, x)
     const dist = Math.sqrt(x * x + z * z)
 
     // Wavy edge effect
     const wave = Math.sin(angle * 8) * 0.1 * dist
-    y = y * 0.35 + wave * 0.3
+    let y = origY * 0.35 + wave * 0.3
 
     // Slight radial ripples
     const ripple = Math.sin(dist * 6) * 0.03
@@ -73,7 +74,6 @@ function createMushroomGeometry(): THREE.BufferGeometry {
   const stemPositions = stemGeo.attributes.position
   for (let i = 0; i < stemPositions.count; i++) {
     const x = stemPositions.getX(i)
-    const y = stemPositions.getY(i)
     const z = stemPositions.getZ(i)
     const angle = Math.atan2(z, x)
     const bulge = Math.sin(angle * 5) * 0.02
@@ -616,7 +616,8 @@ export function CoralMesh({ coral }: CoralMeshProps) {
     return mat
   }, [displayColor])
 
-  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -coral.position[1]), [coral.position[1]])
+  const coralY = coral.position[1]
+  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -coralY), [coralY])
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const mouse = useMemo(() => new THREE.Vector2(), [])
 
@@ -639,24 +640,27 @@ export function CoralMesh({ coral }: CoralMeshProps) {
     }
   })
 
-  const handlePointerDown = (e: THREE.Event) => {
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (!cameraLocked || !isSelected) return
     e.stopPropagation()
     setIsDragging(true)
+    // eslint-disable-next-line react-hooks/immutability
     gl.domElement.style.cursor = 'grabbing'
   }
 
   const handlePointerUp = () => {
     if (isDragging) {
       setIsDragging(false)
+      // eslint-disable-next-line react-hooks/immutability
       gl.domElement.style.cursor = 'auto'
     }
   }
 
-  const handlePointerMove = (e: THREE.Event) => {
+  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!isDragging || !cameraLocked) return
 
     const rect = gl.domElement.getBoundingClientRect()
+    // eslint-disable-next-line react-hooks/immutability
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
 
@@ -682,6 +686,7 @@ export function CoralMesh({ coral }: CoralMeshProps) {
     setHovered(h)
     if (!h) handlePointerUp()
     if (cameraLocked && isSelected) {
+      // eslint-disable-next-line react-hooks/immutability
       gl.domElement.style.cursor = h ? 'grab' : 'auto'
     }
   }

@@ -10,7 +10,9 @@ import { useCoralStore } from '../../stores/coralStore'
  * Uses useFrame to update simulation state every frame
  */
 export function SimulationController() {
-  const lastTimeRef = useRef<number>(Date.now())
+  // Initialize ref without calling Date.now() during render
+  const lastTimeRef = useRef<number>(0)
+  const initializedRef = useRef<boolean>(false)
 
   const isRunning = useSimulationStore((state: SimulationState) => state.isRunning)
   const mode = useSimulationStore((state: SimulationState) => state.mode)
@@ -29,13 +31,19 @@ export function SimulationController() {
   const waterParams = useSimulationStore((state: SimulationState) => state.waterParams)
 
   useFrame(() => {
-    // Only tick when in simulation mode and running
-    if (mode !== 'simulation' || !isRunning) {
-      lastTimeRef.current = Date.now()
-      return
+    const now = Date.now()
+
+    // Initialize time ref on first frame
+    if (!initializedRef.current) {
+      lastTimeRef.current = now
+      initializedRef.current = true
     }
 
-    const now = Date.now()
+    // Only tick when in simulation mode and running
+    if (mode !== 'simulation' || !isRunning) {
+      lastTimeRef.current = now
+      return
+    }
     const deltaMs = now - lastTimeRef.current
     lastTimeRef.current = now
 
@@ -94,27 +102,4 @@ export function SimulationController() {
 
   // This component renders nothing
   return null
-}
-
-/**
- * Hook to get simulation-aware values for fish and corals
- * These can be used by mesh components to adjust behavior
- */
-export function useSimulationContext() {
-  const mode = useSimulationStore((state) => state.mode)
-  const isRunning = useSimulationStore((state) => state.isRunning)
-  const timeOfDay = useSimulationStore((state) => state.timeOfDay)
-  const dayProgress = useSimulationStore((state) => state.dayProgress)
-  const difficulty = useSimulationStore((state) => state.difficulty)
-  const getDifficultyConfig = useSimulationStore((state) => state.getDifficultyConfig)
-
-  return {
-    isSimulating: mode === 'simulation' && isRunning,
-    mode,
-    isRunning,
-    timeOfDay,
-    dayProgress,
-    difficulty,
-    difficultyConfig: getDifficultyConfig(),
-  }
 }

@@ -23,7 +23,7 @@ export interface RockBounds {
 
 // Get scaled half-extents for a rock
 export function getRockBounds(
-  type: 'procedural' | 'model',
+  _type: 'procedural' | 'model',
   proceduralType: ProceduralRockType | undefined,
   scale: number
 ): RockBounds {
@@ -71,7 +71,7 @@ export function clampRockPosition(
 
 // Calculate maximum allowed scale for a rock type given tank dimensions
 export function getMaxScale(
-  type: 'procedural' | 'model',
+  _type: 'procedural' | 'model',
   proceduralType: ProceduralRockType | undefined,
   tankDimensions: { length: number; width: number; height: number }
 ): number {

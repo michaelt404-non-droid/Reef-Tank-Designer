@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useEquipmentStore } from '../../stores/equipmentStore'
-import { EQUIPMENT_INFO, EQUIPMENT_TYPES, getEquipmentTypeLabel, getEquipmentByType } from '../../data/equipment'
+import { EQUIPMENT_TYPES, getEquipmentTypeLabel, getEquipmentByType } from '../../data/equipment'
 
 type EquipmentType = 'pump' | 'heater' | 'skimmer' | 'powerhead' | 'wavemaker' | 'ato'
 

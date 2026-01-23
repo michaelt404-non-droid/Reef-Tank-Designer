@@ -9,8 +9,7 @@ export const CORAL_PAR_REQUIREMENTS = {
 } as const
 
 // Inline type to avoid Safari import issues
-const CORAL_TYPES = ['mushrooms', 'zoanthids', 'softCorals', 'lps', 'sps', 'acropora'] as const
-type CoralType = typeof CORAL_TYPES[number]
+type CoralType = 'mushrooms' | 'zoanthids' | 'softCorals' | 'lps' | 'sps' | 'acropora'
 
 interface CoralInfo {
   id: CoralType

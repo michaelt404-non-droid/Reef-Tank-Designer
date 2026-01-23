@@ -13,7 +13,7 @@ export function PAROverlay() {
   const dimensions = useTankStore((state) => state.dimensions)
 
   // Generate PAR heatmap geometry
-  const { geometry, colors } = useMemo(() => {
+  const { geometry } = useMemo(() => {
     const tankLength = dimensions.length * SCALE
     const tankWidth = dimensions.width * SCALE
 

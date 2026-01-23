@@ -25,23 +25,11 @@ function createHeaterGeometry(size: { width: number; height: number; depth: numb
   const height = size.height * TANK_SCALE
   const radius = (size.width * TANK_SCALE) / 2
 
-  const group = new THREE.Group()
-
   // Main tube
   const tube = new THREE.CylinderGeometry(radius, radius, height * 0.85, 12)
   tube.translate(0, height * 0.425, 0)
 
-  // Top cap
-  const cap = new THREE.CylinderGeometry(radius * 1.3, radius, height * 0.15, 12)
-  cap.translate(0, height * 0.925, 0)
-
-  // Merge geometries
-  const merged = new THREE.BufferGeometry()
-  const tubeMesh = new THREE.Mesh(tube)
-  const capMesh = new THREE.Mesh(cap)
-
-  merged.copy(tube)
-  return merged
+  return tube
 }
 
 function createPumpGeometry(size: { width: number; height: number; depth: number }): THREE.BufferGeometry {
@@ -58,15 +46,10 @@ function createPumpGeometry(size: { width: number; height: number; depth: number
 function createSkimmerGeometry(size: { width: number; height: number; depth: number }): THREE.BufferGeometry {
   const w = size.width * TANK_SCALE
   const h = size.height * TANK_SCALE
-  const d = size.depth * TANK_SCALE
 
   // Main body cylinder
   const body = new THREE.CylinderGeometry(w / 2, w / 2, h * 0.7, 16)
   body.translate(0, h * 0.35, 0)
-
-  // Collection cup on top
-  const cup = new THREE.CylinderGeometry(w / 2.5, w / 2, h * 0.3, 16)
-  cup.translate(0, h * 0.85, 0)
 
   return body
 }
@@ -84,7 +67,6 @@ function createPowerheadGeometry(size: { width: number; height: number; depth: n
 }
 
 function createWavemakerGeometry(size: { width: number; height: number; depth: number }): THREE.BufferGeometry {
-  const w = size.width * TANK_SCALE
   const h = size.height * TANK_SCALE
   const d = size.depth * TANK_SCALE
 

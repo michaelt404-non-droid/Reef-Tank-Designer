@@ -11,6 +11,18 @@ interface CompatibilityRule {
   reason: string
 }
 
+// Pattern types for fish coloration
+type PatternType = 'solid' | 'stripes' | 'horizontal_stripes' | 'spots' | 'gradient' | 'two_tone'
+
+interface PatternConfig {
+  type: PatternType
+  colors?: string[]
+  stripeCount?: number
+  stripeWidth?: number
+  spotSize?: number
+  spotDensity?: number
+}
+
 interface FishInfo {
   id: FishType
   name: string
@@ -23,6 +35,10 @@ interface FishInfo {
   reefSafe: boolean | 'caution' // safe with corals?
   maxPerTank: number // maximum recommended of this species
   compatibility: CompatibilityRule[] // specific compatibility rules
+  // Visual customization (optional)
+  pattern?: PatternConfig // Pattern for vertex colors
+  modelPath?: string // Optional path to GLTF model
+  useModel?: boolean // Flag to prefer model over procedural
 }
 
 export const FISH_INFO: FishInfo[] = [
@@ -40,6 +56,8 @@ export const FISH_INFO: FishInfo[] = [
     compatibility: [
       { fishType: 'clownfish', level: 'caution', reason: 'May fight if not a mated pair' },
     ],
+    // Classic white vertical stripes
+    pattern: { type: 'stripes', stripeCount: 3, stripeWidth: 0.12 },
   },
   {
     id: 'tang',
@@ -56,6 +74,8 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'tang', level: 'incompatible', reason: 'Highly territorial with other tangs' },
       { fishType: 'angelfish', level: 'caution', reason: 'May compete for territory' },
     ],
+    // Gradient from head to tail
+    pattern: { type: 'gradient' },
   },
   {
     id: 'wrasse',
@@ -72,6 +92,8 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'wrasse', level: 'caution', reason: 'Males may fight' },
       { fishType: 'goby', level: 'caution', reason: 'May outcompete for food' },
     ],
+    // Horizontal stripes typical of many wrasse
+    pattern: { type: 'horizontal_stripes', stripeCount: 4, stripeWidth: 0.08 },
   },
   {
     id: 'goby',
@@ -87,6 +109,8 @@ export const FISH_INFO: FishInfo[] = [
     compatibility: [
       { fishType: 'blenny', level: 'caution', reason: 'May compete for hiding spots' },
     ],
+    // Two-tone coloration (darker below)
+    pattern: { type: 'two_tone' },
   },
   {
     id: 'blenny',
@@ -103,6 +127,8 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'blenny', level: 'caution', reason: 'May be territorial with other blennies' },
       { fishType: 'goby', level: 'caution', reason: 'May compete for hiding spots' },
     ],
+    // Spotted/mottled pattern
+    pattern: { type: 'spots', spotSize: 0.08, spotDensity: 0.4 },
   },
   {
     id: 'angelfish',
@@ -119,6 +145,8 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'angelfish', level: 'incompatible', reason: 'Very territorial with other angels' },
       { fishType: 'tang', level: 'caution', reason: 'May compete for territory' },
     ],
+    // Bold vertical stripes
+    pattern: { type: 'stripes', stripeCount: 5, stripeWidth: 0.08 },
   },
   {
     id: 'chromis',
@@ -132,6 +160,8 @@ export const FISH_INFO: FishInfo[] = [
     reefSafe: true,
     maxPerTank: 7, // Best kept in odd-numbered schools
     compatibility: [], // Peaceful with everyone
+    // Solid coloration typical of chromis
+    pattern: { type: 'solid' },
   },
   {
     id: 'cardinalfish',
@@ -145,6 +175,8 @@ export const FISH_INFO: FishInfo[] = [
     reefSafe: true,
     maxPerTank: 5,
     compatibility: [], // Peaceful with everyone
+    // Spotted pattern (Banggai-style)
+    pattern: { type: 'spots', spotSize: 0.1, spotDensity: 0.3 },
   },
 ]
 
@@ -264,4 +296,4 @@ export function calculateTankGallons(dimensions: { length: number; width: number
 }
 
 export { FISH_TYPES }
-export type { FishType, FishInfo, CompatibilityLevel, CompatibilityRule, CompatibilityIssue, TankCompatibilityReport }
+export type { FishType, FishInfo, CompatibilityLevel, CompatibilityRule, CompatibilityIssue, TankCompatibilityReport, PatternType, PatternConfig }

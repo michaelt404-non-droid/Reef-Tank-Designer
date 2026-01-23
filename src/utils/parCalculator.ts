@@ -93,7 +93,6 @@ export function generatePARGrid(
   // Convert tank dimensions to 3D units
   const tankLength = tankDimensions.length * SCALE
   const tankWidth = tankDimensions.width * SCALE
-  const tankHeight = tankDimensions.height * SCALE
 
   // Sample points on the sand bed (y = 0.1 for sand surface)
   const sandY = 0.15

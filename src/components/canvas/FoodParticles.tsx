@@ -46,11 +46,12 @@ function FoodParticleMesh({ particle }: FoodParticleMeshProps) {
     switch (particle.type) {
       case 'pellet':
         return new THREE.SphereGeometry(size, 8, 8)
-      case 'flake':
+      case 'flake': {
         // Flat irregular shape for flakes
         const flakeGeo = new THREE.CircleGeometry(size, 6)
         flakeGeo.rotateX(-Math.PI / 4) // Tilt slightly
         return flakeGeo
+      }
       case 'frozen':
         // Slightly larger, irregular blob
         return new THREE.IcosahedronGeometry(size, 0)

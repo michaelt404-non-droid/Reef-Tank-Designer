@@ -1,39 +1,11 @@
-import { useRef, useMemo, Suspense } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { useFishStore } from '../../stores/fishStore'
-import { useTankStore } from '../../stores/tankStore'
-import { useSimulationStore } from '../../stores/simulationStore'
-import { FISH_INFO } from '../../data/fish'
+import { FISH_INFO } from '../data/fish'
 
 // Inline type to avoid Safari import issues
 type FishType = 'clownfish' | 'tang' | 'wrasse' | 'goby' | 'blenny' | 'angelfish' | 'chromis' | 'cardinalfish'
 
-interface PlacedFish {
-  id: string
-  fishType: FishType
-  position: [number, number, number]
-  rotation: [number, number, number]
-  targetPosition: [number, number, number]
-  scale: number
-  color: string
-  swimSpeed: number
-  // Simulation properties
-  hunger: number
-  health: number
-  age: number
-  growthProgress: number
-  stressLevel: number
-  lastFed: number
-}
-
-interface FishMeshProps {
-  fish: PlacedFish
-}
-
 // Species-specific shape parameters
-interface FishShapeParams {
+export interface FishShapeParams {
   bodyLength: number
   bodyHeight: number
   bodyWidth: number
@@ -47,7 +19,7 @@ interface FishShapeParams {
   bellyBulge: number
 }
 
-function getShapeParams(type: FishType): FishShapeParams {
+export function getShapeParams(type: FishType): FishShapeParams {
   switch (type) {
     case 'clownfish':
       return {
@@ -121,124 +93,19 @@ function bezierPoint(t: number, p0: number, p1: number, p2: number, p3: number):
   return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3
 }
 
-// Create fish body geometry with improved shapes
-function createFishGeometry(type: FishType): { geometry: THREE.BufferGeometry; uvs: Float32Array } {
-  const allPositions: number[] = []
-  const allNormals: number[] = []
-  const allUvs: number[] = []
-
-  const params = getShapeParams(type)
-
-  const addGeometry = (geo: THREE.BufferGeometry, uvOffset = { u: 0, v: 0 }, uvScale = { u: 1, v: 1 }) => {
-    const pos = geo.attributes.position.array
-    const norm = geo.attributes.normal.array
-    for (let i = 0; i < pos.length; i++) {
-      allPositions.push(pos[i])
-      allNormals.push(norm[i])
-    }
-    // Generate UVs based on position
-    for (let i = 0; i < pos.length; i += 3) {
-      const x = pos[i]
-      const y = pos[i + 1]
-      // Map x to u (0-1 along body length)
-      const u = ((x / params.bodyLength) + 0.5) * uvScale.u + uvOffset.u
-      // Map y to v
-      const v = ((y / params.bodyHeight) + 0.5) * uvScale.v + uvOffset.v
-      allUvs.push(Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)))
-    }
+function addGeometryToArrays(geo: THREE.BufferGeometry, positions: number[], normals: number[], uvs: number[]) {
+  const pos = geo.attributes.position.array
+  const norm = geo.attributes.normal.array
+  for (let i = 0; i < pos.length; i++) {
+    positions.push(pos[i])
+    normals.push(norm[i])
   }
-
-  // Main body - use higher resolution sphere with Bezier profile deformation
-  const bodySegmentsX = 24
-  const bodySegmentsY = 16
-  const bodyGeo = new THREE.SphereGeometry(0.5, bodySegmentsX, bodySegmentsY)
-  bodyGeo.scale(params.bodyLength, params.bodyHeight, params.bodyWidth)
-
-  const bodyPositions = bodyGeo.attributes.position
-  for (let i = 0; i < bodyPositions.count; i++) {
-    const x = bodyPositions.getX(i)
-    let y = bodyPositions.getY(i)
-    const z = bodyPositions.getZ(i)
-
-    // Normalize x position for profile calculation (-0.5 to 0.5)
-    const normalizedX = x / params.bodyLength
-
-    // Bezier curve for body profile (top view - width)
-    // Control points create tapered tail and pointed/rounded nose
-    let widthMultiplier: number
-    if (normalizedX < 0) {
-      // Tail end - taper smoothly
-      const t = (normalizedX + 0.5) / 0.5 // 0 at tail, 1 at middle
-      widthMultiplier = bezierPoint(t, 0.2, 0.4, 0.8, 1.0)
-    } else {
-      // Head end - nose shape
-      const t = normalizedX / 0.5 // 0 at middle, 1 at nose
-      if (params.noseShape === 'pointed') {
-        widthMultiplier = bezierPoint(t, 1.0, 0.9, 0.5, 0.15)
-      } else if (params.noseShape === 'blunt') {
-        widthMultiplier = bezierPoint(t, 1.0, 0.95, 0.8, 0.5)
-      } else {
-        widthMultiplier = bezierPoint(t, 1.0, 0.9, 0.7, 0.35)
-      }
-    }
-
-    // Bezier curve for body profile (side view - height)
-    let heightMultiplier: number
-    if (normalizedX < 0) {
-      // Tail end taper
-      const t = (normalizedX + 0.5) / 0.5
-      heightMultiplier = bezierPoint(t, 0.25, 0.5, 0.85, 1.0)
-    } else {
-      // Head end
-      const t = normalizedX / 0.5
-      heightMultiplier = bezierPoint(t, 1.0, 0.95, 0.7, 0.4)
-    }
-
-    // Apply belly bulge (lower half only)
-    if (y < 0) {
-      const bellyFactor = 1 + params.bellyBulge * Math.cos(normalizedX * Math.PI) * (1 - Math.abs(y / (params.bodyHeight * 0.5)))
-      y *= bellyFactor
-    }
-
-    bodyPositions.setY(i, y * heightMultiplier)
-    bodyPositions.setZ(i, z * widthMultiplier)
-
-    // Slight x adjustment for streamlined shape
-    if (normalizedX < -0.3) {
-      // Elongate tail section slightly
-      bodyPositions.setX(i, x * 1.1)
-    }
+  // Simple UV mapping for fins - use position-based
+  for (let i = 0; i < pos.length; i += 3) {
+    const x = pos[i]
+    const y = pos[i + 1]
+    uvs.push((x + 1) * 0.5, (y + 1) * 0.5)
   }
-  bodyPositions.needsUpdate = true
-  bodyGeo.computeVertexNormals()
-  addGeometry(bodyGeo)
-
-  // Tail fin - shape varies by type
-  createTailFin(params, allPositions, allNormals, allUvs)
-
-  // Dorsal fin
-  createDorsalFin(params, allPositions, allNormals, allUvs)
-
-  // Anal fin (below body)
-  if (params.hasAnalFin) {
-    createAnalFin(params, allPositions, allNormals, allUvs)
-  }
-
-  // Pelvic fins (small paired fins near belly)
-  createPelvicFins(params, allPositions, allNormals, allUvs)
-
-  // Pectoral fins (tear-drop shape on sides)
-  createPectoralFins(params, allPositions, allNormals, allUvs)
-
-  // Eyes with proper socket and pupil indent
-  createEyes(params, allPositions, allNormals, allUvs)
-
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(allPositions, 3))
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(allNormals, 3))
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(allUvs, 2))
-
-  return { geometry, uvs: new Float32Array(allUvs) }
 }
 
 function createTailFin(params: FishShapeParams, positions: number[], normals: number[], uvs: number[]) {
@@ -487,25 +354,130 @@ function createEyes(params: FishShapeParams, positions: number[], normals: numbe
   addGeometryToArrays(pupil2, positions, normals, uvs)
 }
 
-function addGeometryToArrays(geo: THREE.BufferGeometry, positions: number[], normals: number[], uvs: number[]) {
-  const pos = geo.attributes.position.array
-  const norm = geo.attributes.normal.array
-  for (let i = 0; i < pos.length; i++) {
-    positions.push(pos[i])
-    normals.push(norm[i])
+// Create fish body geometry with improved shapes
+export function createFishGeometry(type: FishType): { geometry: THREE.BufferGeometry; uvs: Float32Array } {
+  const allPositions: number[] = []
+  const allNormals: number[] = []
+  const allUvs: number[] = []
+
+  const params = getShapeParams(type)
+
+  const addGeometry = (geo: THREE.BufferGeometry, uvOffset = { u: 0, v: 0 }, uvScale = { u: 1, v: 1 }) => {
+    const pos = geo.attributes.position.array
+    const norm = geo.attributes.normal.array
+    for (let i = 0; i < pos.length; i++) {
+      allPositions.push(pos[i])
+      allNormals.push(norm[i])
+    }
+    // Generate UVs based on position
+    for (let i = 0; i < pos.length; i += 3) {
+      const x = pos[i]
+      const y = pos[i + 1]
+      // Map x to u (0-1 along body length)
+      const u = ((x / params.bodyLength) + 0.5) * uvScale.u + uvOffset.u
+      // Map y to v
+      const v = ((y / params.bodyHeight) + 0.5) * uvScale.v + uvOffset.v
+      allUvs.push(Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)))
+    }
   }
-  // Simple UV mapping for fins - use position-based
-  for (let i = 0; i < pos.length; i += 3) {
-    const x = pos[i]
-    const y = pos[i + 1]
-    uvs.push((x + 1) * 0.5, (y + 1) * 0.5)
+
+  // Main body - use higher resolution sphere with Bezier profile deformation
+  const bodySegmentsX = 24
+  const bodySegmentsY = 16
+  const bodyGeo = new THREE.SphereGeometry(0.5, bodySegmentsX, bodySegmentsY)
+  bodyGeo.scale(params.bodyLength, params.bodyHeight, params.bodyWidth)
+
+  const bodyPositions = bodyGeo.attributes.position
+  for (let i = 0; i < bodyPositions.count; i++) {
+    const x = bodyPositions.getX(i)
+    let y = bodyPositions.getY(i)
+    const z = bodyPositions.getZ(i)
+
+    // Normalize x position for profile calculation (-0.5 to 0.5)
+    const normalizedX = x / params.bodyLength
+
+    // Bezier curve for body profile (top view - width)
+    // Control points create tapered tail and pointed/rounded nose
+    let widthMultiplier: number
+    if (normalizedX < 0) {
+      // Tail end - taper smoothly
+      const t = (normalizedX + 0.5) / 0.5 // 0 at tail, 1 at middle
+      widthMultiplier = bezierPoint(t, 0.2, 0.4, 0.8, 1.0)
+    } else {
+      // Head end - nose shape
+      const t = normalizedX / 0.5 // 0 at middle, 1 at nose
+      if (params.noseShape === 'pointed') {
+        widthMultiplier = bezierPoint(t, 1.0, 0.9, 0.5, 0.15)
+      } else if (params.noseShape === 'blunt') {
+        widthMultiplier = bezierPoint(t, 1.0, 0.95, 0.8, 0.5)
+      } else {
+        widthMultiplier = bezierPoint(t, 1.0, 0.9, 0.7, 0.35)
+      }
+    }
+
+    // Bezier curve for body profile (side view - height)
+    let heightMultiplier: number
+    if (normalizedX < 0) {
+      // Tail end taper
+      const t = (normalizedX + 0.5) / 0.5
+      heightMultiplier = bezierPoint(t, 0.25, 0.5, 0.85, 1.0)
+    } else {
+      // Head end
+      const t = normalizedX / 0.5
+      heightMultiplier = bezierPoint(t, 1.0, 0.95, 0.7, 0.4)
+    }
+
+    // Apply belly bulge (lower half only)
+    if (y < 0) {
+      const bellyFactor = 1 + params.bellyBulge * Math.cos(normalizedX * Math.PI) * (1 - Math.abs(y / (params.bodyHeight * 0.5)))
+      y *= bellyFactor
+    }
+
+    bodyPositions.setY(i, y * heightMultiplier)
+    bodyPositions.setZ(i, z * widthMultiplier)
+
+    // Slight x adjustment for streamlined shape
+    if (normalizedX < -0.3) {
+      // Elongate tail section slightly
+      bodyPositions.setX(i, x * 1.1)
+    }
   }
+  bodyPositions.needsUpdate = true
+  bodyGeo.computeVertexNormals()
+  addGeometry(bodyGeo)
+
+  // Tail fin - shape varies by type
+  createTailFin(params, allPositions, allNormals, allUvs)
+
+  // Dorsal fin
+  createDorsalFin(params, allPositions, allNormals, allUvs)
+
+  // Anal fin (below body)
+  if (params.hasAnalFin) {
+    createAnalFin(params, allPositions, allNormals, allUvs)
+  }
+
+  // Pelvic fins (small paired fins near belly)
+  createPelvicFins(params, allPositions, allNormals, allUvs)
+
+  // Pectoral fins (tear-drop shape on sides)
+  createPectoralFins(params, allPositions, allNormals, allUvs)
+
+  // Eyes with proper socket and pupil indent
+  createEyes(params, allPositions, allNormals, allUvs)
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(allPositions, 3))
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(allNormals, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(allUvs, 2))
+
+  return { geometry, uvs: new Float32Array(allUvs) }
 }
 
 // Pattern generation for vertex colors
-type PatternType = 'solid' | 'stripes' | 'horizontal_stripes' | 'spots' | 'gradient' | 'two_tone'
+export type PatternType = 'solid' | 'stripes' | 'horizontal_stripes' | 'spots' | 'gradient' | 'two_tone'
 
-interface PatternConfig {
+export interface PatternConfig {
   type: PatternType
   colors?: string[]
   stripeCount?: number
@@ -514,7 +486,7 @@ interface PatternConfig {
   spotDensity?: number
 }
 
-function getPatternForFish(fishType: FishType): PatternConfig {
+export function getPatternForFish(fishType: FishType): PatternConfig {
   const fishInfo = FISH_INFO.find(f => f.id === fishType)
   if (fishInfo?.pattern) {
     return fishInfo.pattern as PatternConfig
@@ -538,7 +510,7 @@ function getPatternForFish(fishType: FishType): PatternConfig {
   }
 }
 
-function generateVertexColors(
+export function generateVertexColors(
   uvs: Float32Array,
   baseColor: string,
   pattern: PatternConfig
@@ -618,334 +590,4 @@ function generateVertexColors(
   }
 
   return new Float32Array(colors)
-}
-
-// GLTF Model component for loaded fish models
-function ModelFishMesh({
-  fish,
-  modelPath,
-  onSelect
-}: {
-  fish: PlacedFish
-  modelPath: string
-  onSelect: () => void
-}) {
-  const groupRef = useRef<THREE.Group>(null)
-  const { scene } = useGLTF(modelPath)
-  const clonedScene = useMemo(() => scene.clone(), [scene])
-
-  // Apply color tint to all meshes in the model
-  useMemo(() => {
-    clonedScene.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.material = new THREE.MeshPhysicalMaterial({
-          color: fish.color,
-          roughness: 0.25,
-          metalness: 0.05,
-          clearcoat: 0.8,
-          clearcoatRoughness: 0.15,
-        })
-      }
-    })
-  }, [clonedScene, fish.color])
-
-  return (
-    <primitive
-      ref={groupRef}
-      object={clonedScene}
-      position={fish.position}
-      rotation={fish.rotation}
-      scale={fish.scale}
-      onClick={(e: { stopPropagation: () => void }) => {
-        e.stopPropagation()
-        onSelect()
-      }}
-    />
-  )
-}
-
-export function FishMesh({ fish }: FishMeshProps) {
-  const groupRef = useRef<THREE.Group>(null)
-  const meshRef = useRef<THREE.Mesh>(null)
-  const tailRef = useRef<number>(0)
-  const pectoralRef = useRef<number>(0)
-  const bodyFlexRef = useRef<number>(0)
-
-  const updateFish = useFishStore((state) => state.updateFish)
-  const selectFish = useFishStore((state) => state.selectFish)
-  const selectedFishId = useFishStore((state) => state.selectedFishId)
-  const tankDimensions = useTankStore((state) => state.dimensions)
-
-  // Simulation state
-  const mode = useSimulationStore((state) => state.mode)
-  const isRunning = useSimulationStore((state) => state.isRunning)
-  const foodParticles = useSimulationStore((state) => state.foodParticles)
-
-  const isSelected = selectedFishId === fish.id
-  const isSimulating = mode === 'simulation' && isRunning
-
-  // Check for GLTF model path
-  const fishInfo = FISH_INFO.find(f => f.id === fish.fishType)
-  const hasModel = fishInfo?.modelPath && fishInfo?.useModel
-
-  // Create geometry with UVs
-  const { geometry, uvs } = useMemo(() => createFishGeometry(fish.fishType), [fish.fishType])
-
-  // Generate pattern-based vertex colors
-  const pattern = useMemo(() => getPatternForFish(fish.fishType), [fish.fishType])
-  const vertexColors = useMemo(
-    () => generateVertexColors(uvs, fish.color, pattern),
-    [uvs, fish.color, pattern]
-  )
-
-  // Apply vertex colors to geometry
-  useMemo(() => {
-    geometry.setAttribute('color', new THREE.BufferAttribute(vertexColors, 3))
-  }, [geometry, vertexColors])
-
-  // Enhanced material with sheen for iridescent scales
-  const material = useMemo(() => {
-    const baseColor = new THREE.Color(fish.color)
-    const sheenColor = baseColor.clone()
-    sheenColor.offsetHSL(0.05, 0.1, 0.15) // Slightly shifted hue for iridescence
-
-    return new THREE.MeshPhysicalMaterial({
-      color: fish.color,
-      roughness: 0.25,
-      metalness: 0.05,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.15,
-      sheen: 0.4,
-      sheenRoughness: 0.3,
-      sheenColor: sheenColor,
-      vertexColors: pattern.type !== 'solid',
-    })
-  }, [fish.color, pattern.type])
-
-  // Swimming animation and AI with improved motion
-  useFrame((_, delta) => {
-    if (!groupRef.current) return
-
-    const SCALE = 0.1
-    const margin = 0.2
-    const tankHalfLength = (tankDimensions.length * SCALE) / 2 - margin
-    const tankHalfWidth = (tankDimensions.width * SCALE) / 2 - margin
-    const tankHeight = tankDimensions.height * SCALE
-
-    // Get current position
-    let [x, y, z] = fish.position
-    let [tx, ty, tz] = fish.targetPosition
-
-    // In simulation mode, hungry fish seek food
-    let seekingFood = false
-    if (isSimulating && fish.hunger > 0.3 && foodParticles.length > 0) {
-      // Find nearest food particle
-      let nearestFood = null
-      let nearestDist = Infinity
-
-      for (const food of foodParticles) {
-        const fdx = food.position[0] - x
-        const fdy = food.position[1] - y
-        const fdz = food.position[2] - z
-        const foodDist = Math.sqrt(fdx * fdx + fdy * fdy + fdz * fdz)
-
-        // Only target food within detection range (hungrier = larger range)
-        const detectionRange = 1.5 + fish.hunger * 2 // 1.5 to 3.5 units
-        if (foodDist < nearestDist && foodDist < detectionRange) {
-          nearestDist = foodDist
-          nearestFood = food
-        }
-      }
-
-      if (nearestFood) {
-        // Target the food particle
-        tx = nearestFood.position[0]
-        ty = nearestFood.position[1]
-        tz = nearestFood.position[2]
-        seekingFood = true
-      }
-    }
-
-    // Calculate direction to target
-    const dx = tx - x
-    const dy = ty - y
-    const dz = tz - z
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-    // If close to target and not seeking food, pick new random target
-    // Idle behavior: slower, more varied movement when not seeking food
-    if (distance < 0.1 && !seekingFood) {
-      // More varied idle targets - fish tend to stay in preferred areas
-      const idleRadius = isSimulating ? 0.5 : 0.8
-      const currentArea = {
-        x: fish.position[0],
-        y: fish.position[1],
-        z: fish.position[2]
-      }
-      const newTarget: [number, number, number] = [
-        Math.max(-tankHalfLength, Math.min(tankHalfLength, currentArea.x + (Math.random() - 0.5) * idleRadius * 2)),
-        Math.max(0.3, Math.min(tankHeight - 0.3, currentArea.y + (Math.random() - 0.5) * idleRadius)),
-        Math.max(-tankHalfWidth, Math.min(tankHalfWidth, currentArea.z + (Math.random() - 0.5) * idleRadius * 2)),
-      ]
-      updateFish(fish.id, { targetPosition: newTarget })
-      return
-    }
-
-    // Calculate speed based on hunger and health
-    // Hungry fish swim faster toward food, but low health slows them down
-    let speedMultiplier = 1.0
-    if (isSimulating) {
-      const hungerBoost = seekingFood ? (1 + fish.hunger * 0.5) : (1 - fish.hunger * 0.3)
-      const healthPenalty = 0.5 + fish.health * 0.5 // 50% to 100% based on health
-      speedMultiplier = hungerBoost * healthPenalty
-    }
-
-    // Idle fish swim slower with occasional pauses
-    if (!seekingFood && !isSimulating) {
-      speedMultiplier *= 0.6
-    }
-
-    // Move toward target
-    const speed = fish.swimSpeed * delta * speedMultiplier
-    const moveX = (dx / distance) * speed
-    const moveY = (dy / distance) * speed
-    const moveZ = (dz / distance) * speed
-
-    x += moveX
-    y += moveY
-    z += moveZ
-
-    // Clamp to tank bounds
-    x = Math.max(-tankHalfLength, Math.min(tankHalfLength, x))
-    y = Math.max(0.2, Math.min(tankHeight - 0.2, y))
-    z = Math.max(-tankHalfWidth, Math.min(tankHalfWidth, z))
-
-    // Calculate rotation to face direction
-    const targetAngle = Math.atan2(dz, dx)
-
-    // Smooth rotation
-    const currentAngle = fish.rotation[1]
-    let angleDiff = targetAngle - currentAngle
-
-    // Normalize angle difference
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2
-
-    const newAngle = currentAngle + angleDiff * Math.min(1, delta * 3)
-
-    // IMPROVED ANIMATION
-
-    // Tail oscillation - amplitude varies with speed
-    const effectiveSpeed = speed / delta // Get actual speed
-    const tailAmplitude = seekingFood ? 0.15 : (0.08 + effectiveSpeed * 0.3)
-    const tailFrequency = seekingFood ? 18 : (8 + effectiveSpeed * 15)
-    tailRef.current += delta * tailFrequency * fish.swimSpeed
-    const tailWiggle = Math.sin(tailRef.current) * tailAmplitude
-
-    // Body flex - subtle S-curve during fast swimming
-    const bodyFlexAmount = seekingFood ? 0.05 : 0.02
-    bodyFlexRef.current += delta * tailFrequency * 0.5
-    const bodyFlex = Math.sin(bodyFlexRef.current) * bodyFlexAmount * effectiveSpeed
-
-    // Pectoral fin flutter - independent movement
-    pectoralRef.current += delta * 12
-
-    // Apply slight roll when turning
-    const roll = angleDiff * 0.3 + bodyFlex
-
-    // Pitch slightly when moving up/down
-    const pitch = (dy / (distance + 0.001)) * 0.2
-
-    // Update fish state
-    updateFish(fish.id, {
-      position: [x, y, z],
-      rotation: [roll, newAngle, pitch],
-    })
-
-    // Update mesh
-    groupRef.current.position.set(x, y, z)
-    groupRef.current.rotation.set(roll, newAngle + Math.PI, tailWiggle)
-
-    // Apply body deformation for S-curve swimming (if mesh available)
-    if (meshRef.current && meshRef.current.geometry) {
-      // Store original positions if not already stored
-      const geo = meshRef.current.geometry
-      if (!geo.userData.originalPositions) {
-        geo.userData.originalPositions = new Float32Array(geo.attributes.position.array)
-      }
-
-      // Apply subtle body deformation based on position along length
-      const positions = geo.attributes.position
-      const origPositions = geo.userData.originalPositions
-
-      for (let i = 0; i < positions.count; i++) {
-        const origX = origPositions[i * 3]
-        const origZ = origPositions[i * 3 + 2]
-
-        // S-curve deformation - more pronounced toward tail
-        const normalizedX = origX / 0.5 // -1 to 1 along body
-        const deformFactor = Math.max(0, -normalizedX) // Only affects back half
-        const sineDeform = Math.sin(tailRef.current + normalizedX * 2) * bodyFlexAmount * deformFactor * 0.3
-
-        positions.setZ(i, origZ + sineDeform)
-      }
-      positions.needsUpdate = true
-    }
-  })
-
-  // Determine health indicator color
-  const getHealthColor = () => {
-    if (!isSimulating) return null
-    if (fish.health < 0.3) return '#ef4444' // Red - critical
-    if (fish.hunger > 0.7) return '#f97316' // Orange - very hungry
-    if (fish.health < 0.6 || fish.hunger > 0.5) return '#eab308' // Yellow - warning
-    return null // Don't show indicator if healthy and fed
-  }
-  const healthColor = getHealthColor()
-
-  // If using GLTF model
-  if (hasModel && fishInfo?.modelPath) {
-    return (
-      <Suspense fallback={
-        <group ref={groupRef} scale={fish.scale}>
-          <mesh geometry={geometry} material={material} />
-        </group>
-      }>
-        <ModelFishMesh
-          fish={fish}
-          modelPath={fishInfo.modelPath}
-          onSelect={() => selectFish(fish.id)}
-        />
-      </Suspense>
-    )
-  }
-
-  return (
-    <group ref={groupRef} scale={fish.scale}>
-      <mesh
-        ref={meshRef}
-        geometry={geometry}
-        material={material}
-        onClick={(e) => {
-          e.stopPropagation()
-          selectFish(fish.id)
-        }}
-        castShadow
-      />
-      {/* Selection indicator */}
-      {isSelected && (
-        <mesh position={[0, 0.8, 0]}>
-          <sphereGeometry args={[0.1, 8, 8]} />
-          <meshBasicMaterial color="#22c55e" />
-        </mesh>
-      )}
-      {/* Health/hunger indicator during simulation */}
-      {healthColor && !isSelected && (
-        <mesh position={[0, 0.6, 0]}>
-          <sphereGeometry args={[0.06, 6, 6]} />
-          <meshBasicMaterial color={healthColor} transparent opacity={0.8} />
-        </mesh>
-      )}
-    </group>
-  )
 }

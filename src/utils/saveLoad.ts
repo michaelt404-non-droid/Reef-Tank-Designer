@@ -199,28 +199,48 @@ export function restoreSaveData(data: SaveData): boolean {
     const rockStore = useRockStore.getState()
     rockStore.clearAllRocks()
     for (const rock of data.rocks) {
-      // Directly set rocks array to preserve IDs
+      // Directly set rocks array to preserve IDs, casting proceduralType properly
       useRockStore.setState(state => ({
-        rocks: [...state.rocks, rock as any]
+        rocks: [...state.rocks, {
+          ...rock,
+          proceduralType: rock.proceduralType as 'boulder' | 'branch' | 'shelf' | 'pillar' | 'rubble' | 'cave' | 'arch' | undefined,
+        }]
       }))
     }
 
-    // Clear and restore corals
+    // Clear and restore corals (add default simulation properties)
     const coralStore = useCoralStore.getState()
     coralStore.clearAllCorals()
     for (const coral of data.corals) {
       useCoralStore.setState(state => ({
-        corals: [...state.corals, coral as any]
+        corals: [...state.corals, {
+          ...coral,
+          coralType: coral.coralType as 'mushrooms' | 'zoanthids' | 'softCorals' | 'lps' | 'sps' | 'acropora',
+          health: 1,
+          growthProgress: 0,
+          colorIntensity: 1,
+          baseScale: coral.scale,
+        }]
       }))
     }
 
-    // Clear and restore fish
+    // Clear and restore fish (add default simulation properties)
     const fishStore = useFishStore.getState()
     fishStore.clearAllFish()
     if (data.fish) {
       for (const f of data.fish) {
         useFishStore.setState(state => ({
-          fish: [...state.fish, f as any]
+          fish: [...state.fish, {
+            ...f,
+            fishType: f.fishType as 'clownfish' | 'tang' | 'wrasse' | 'goby' | 'blenny' | 'angelfish' | 'chromis' | 'cardinalfish',
+            initialScale: f.scale,
+            hunger: 0,
+            health: 1,
+            age: 0,
+            growthProgress: 0,
+            stressLevel: 0,
+            lastFed: 0,
+          }]
         }))
       }
     }
@@ -230,7 +250,7 @@ export function restoreSaveData(data: SaveData): boolean {
     lightStore.clearAllLights()
     for (const light of data.lights) {
       useLightStore.setState(state => ({
-        lights: [...state.lights, light as any]
+        lights: [...state.lights, light]
       }))
     }
 
@@ -240,7 +260,7 @@ export function restoreSaveData(data: SaveData): boolean {
     if (data.equipment) {
       for (const eq of data.equipment) {
         useEquipmentStore.setState(state => ({
-          equipment: [...state.equipment, eq as any]
+          equipment: [...state.equipment, eq]
         }))
       }
     }

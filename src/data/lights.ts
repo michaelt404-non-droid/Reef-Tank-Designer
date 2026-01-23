@@ -1,6 +1,19 @@
 // Light fixture database with PAR data
 
-export const LIGHT_FIXTURES = [
+export interface LightFixtureData {
+  id: string
+  brand: string
+  model: string
+  type: 'led' | 'hybrid' | 't5'
+  coverage: { length: number; width: number }
+  maxPAR: number
+  spreadAngle: number
+  colors: string[]
+  wattage: number
+  price: number
+}
+
+export const LIGHT_FIXTURES: LightFixtureData[] = [
   // AI (Aqua Illumination)
   {
     id: 'ai-hydra-32',

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import {
   saveToLocalStorage,
   loadFromLocalStorage,
@@ -8,25 +8,26 @@ import {
   importFromFile,
 } from '../../utils/saveLoad'
 
+// Helper to get saves list
+function getSavesList(): Record<string, { name: string; timestamp: number }> {
+  const allSaves = getLocalStorageSaves()
+  const savesList: Record<string, { name: string; timestamp: number }> = {}
+  for (const [name, data] of Object.entries(allSaves)) {
+    savesList[name] = { name: data.name, timestamp: data.timestamp }
+  }
+  return savesList
+}
+
 export function SaveLoadControls() {
-  const [saves, setSaves] = useState<Record<string, { name: string; timestamp: number }>>({})
+  // Initialize saves from localStorage directly
+  const [saves, setSaves] = useState<Record<string, { name: string; timestamp: number }>>(getSavesList)
   const [saveName, setSaveName] = useState('')
   const [showSaveInput, setShowSaveInput] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load saves list on mount
-  useEffect(() => {
-    refreshSaves()
-  }, [])
-
   const refreshSaves = () => {
-    const allSaves = getLocalStorageSaves()
-    const savesList: Record<string, { name: string; timestamp: number }> = {}
-    for (const [name, data] of Object.entries(allSaves)) {
-      savesList[name] = { name: data.name, timestamp: data.timestamp }
-    }
-    setSaves(savesList)
+    setSaves(getSavesList())
   }
 
   const showMessage = (text: string, type: 'success' | 'error') => {

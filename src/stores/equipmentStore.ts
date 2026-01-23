@@ -52,7 +52,7 @@ function getEquipmentPosition(
         eqHeight / 2 + 0.1,
         -tankHalfWidth + 0.15,
       ]
-    case 'side':
+    case 'side': {
       // Along side wall (randomly left or right)
       const side = Math.random() > 0.5 ? 1 : -1
       return [
@@ -60,7 +60,8 @@ function getEquipmentPosition(
         tankHeight * 0.6,
         (Math.random() - 0.5) * tankHalfWidth * 0.5,
       ]
-    case 'corner':
+    }
+    case 'corner': {
       // Back corner
       const cornerSide = Math.random() > 0.5 ? 1 : -1
       return [
@@ -68,6 +69,7 @@ function getEquipmentPosition(
         eqHeight / 2 + 0.1,
         -tankHalfWidth + 0.2,
       ]
+    }
     case 'sump':
       // Below/behind tank (not visible in main view)
       return [

@@ -1,8 +1,5 @@
 import { useSimulationStore, TIME_CONFIG } from '../../stores/simulationStore'
 
-// Inline type to avoid Safari issues
-type Difficulty = 'beginner' | 'intermediate' | 'expert'
-
 export function TimeDisplay() {
   const dayProgress = useSimulationStore((state) => state.dayProgress)
   const timeOfDay = useSimulationStore((state) => state.timeOfDay)

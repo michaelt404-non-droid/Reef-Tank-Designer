@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo, Suspense } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import type { ThreeEvent } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useRockStore } from '../../stores/rockStore'
@@ -35,34 +36,92 @@ function createCaveGeometry(): THREE.BufferGeometry {
     }
   }
 
-  // Outer dome
-  const outerGeo = new THREE.SphereGeometry(1, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2)
-  outerGeo.scale(1.2, 0.8, 1.2)
-
-  // Add rock texture
-  const outerPos = outerGeo.attributes.position
-  for (let i = 0; i < outerPos.count; i++) {
-    const x = outerPos.getX(i)
-    const y = outerPos.getY(i)
-    const z = outerPos.getZ(i)
-    const noise = 0.1
-    outerPos.setXYZ(i, x + (Math.random() - 0.5) * noise, y + (Math.random() - 0.5) * noise, z + (Math.random() - 0.5) * noise)
+  // Seeded random for consistent geometry
+  let seed = 54321
+  const seededRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280
+    return seed / 233280
   }
-  outerPos.needsUpdate = true
-  outerGeo.computeVertexNormals()
-  addGeometry(outerGeo)
 
-  // Cave opening (front cutout effect using a recessed section)
-  const openingGeo = new THREE.SphereGeometry(0.6, 12, 8, 0, Math.PI, 0, Math.PI / 2)
-  openingGeo.scale(1, 0.7, 0.8)
-  openingGeo.rotateX(Math.PI)
-  openingGeo.translate(0, 0.3, 0.7)
-  addGeometry(openingGeo)
+  // Main rock body - back and sides (horseshoe shape opening to front)
+  // Back wall
+  const backWall = new THREE.BoxGeometry(1.8, 1.2, 0.5, 4, 4, 2)
+  backWall.translate(0, 0.6, -0.5)
+  const backPos = backWall.attributes.position
+  for (let i = 0; i < backPos.count; i++) {
+    const x = backPos.getX(i)
+    const y = backPos.getY(i)
+    const z = backPos.getZ(i)
+    backPos.setXYZ(i,
+      x + (seededRandom() - 0.5) * 0.15,
+      y + (seededRandom() - 0.5) * 0.1,
+      z + (seededRandom() - 0.5) * 0.1
+    )
+  }
+  backPos.needsUpdate = true
+  backWall.computeVertexNormals()
+  addGeometry(backWall)
 
-  // Base
-  const baseGeo = new THREE.CylinderGeometry(1.1, 1.3, 0.2, 12)
-  baseGeo.translate(0, 0.1, 0)
-  addGeometry(baseGeo)
+  // Left wall
+  const leftWall = new THREE.BoxGeometry(0.5, 1.0, 1.0, 2, 4, 4)
+  leftWall.translate(-0.9, 0.5, 0)
+  const leftPos = leftWall.attributes.position
+  for (let i = 0; i < leftPos.count; i++) {
+    const x = leftPos.getX(i)
+    const y = leftPos.getY(i)
+    const z = leftPos.getZ(i)
+    leftPos.setXYZ(i,
+      x + (seededRandom() - 0.5) * 0.1,
+      y + (seededRandom() - 0.5) * 0.1,
+      z + (seededRandom() - 0.5) * 0.15
+    )
+  }
+  leftPos.needsUpdate = true
+  leftWall.computeVertexNormals()
+  addGeometry(leftWall)
+
+  // Right wall
+  const rightWall = new THREE.BoxGeometry(0.5, 1.0, 1.0, 2, 4, 4)
+  rightWall.translate(0.9, 0.5, 0)
+  const rightPos = rightWall.attributes.position
+  for (let i = 0; i < rightPos.count; i++) {
+    const x = rightPos.getX(i)
+    const y = rightPos.getY(i)
+    const z = rightPos.getZ(i)
+    rightPos.setXYZ(i,
+      x + (seededRandom() - 0.5) * 0.1,
+      y + (seededRandom() - 0.5) * 0.1,
+      z + (seededRandom() - 0.5) * 0.15
+    )
+  }
+  rightPos.needsUpdate = true
+  rightWall.computeVertexNormals()
+  addGeometry(rightWall)
+
+  // Roof/overhang - extends forward over the opening
+  const roof = new THREE.BoxGeometry(2.0, 0.4, 1.4, 4, 2, 4)
+  roof.translate(0, 1.1, 0.1)
+  const roofPos = roof.attributes.position
+  for (let i = 0; i < roofPos.count; i++) {
+    const x = roofPos.getX(i)
+    const y = roofPos.getY(i)
+    const z = roofPos.getZ(i)
+    // Make front edge droop down slightly for overhang effect
+    const frontDroop = z > 0.3 ? (z - 0.3) * 0.3 : 0
+    roofPos.setXYZ(i,
+      x + (seededRandom() - 0.5) * 0.12,
+      y - frontDroop + (seededRandom() - 0.5) * 0.08,
+      z + (seededRandom() - 0.5) * 0.1
+    )
+  }
+  roofPos.needsUpdate = true
+  roof.computeVertexNormals()
+  addGeometry(roof)
+
+  // Base platform
+  const base = new THREE.CylinderGeometry(1.1, 1.3, 0.15, 12)
+  base.translate(0, 0.075, 0)
+  addGeometry(base)
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(allPositions, 3))
@@ -83,54 +142,92 @@ function createArchGeometry(): THREE.BufferGeometry {
     }
   }
 
-  // Left pillar
-  const leftPillar = new THREE.CylinderGeometry(0.25, 0.35, 1.5, 8)
-  leftPillar.translate(-0.8, 0.75, 0)
-  const leftPos = leftPillar.attributes.position
+  // Seeded random for consistent geometry
+  let seed = 98765
+  const seededRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280
+    return seed / 233280
+  }
+
+  // Natural rock bridge - use a tube geometry following an arch path
+  // Create arch curve
+  const archCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-1.0, 0.2, 0),
+    new THREE.Vector3(-0.8, 0.6, 0),
+    new THREE.Vector3(-0.4, 1.1, 0),
+    new THREE.Vector3(0, 1.3, 0),
+    new THREE.Vector3(0.4, 1.1, 0),
+    new THREE.Vector3(0.8, 0.6, 0),
+    new THREE.Vector3(1.0, 0.2, 0),
+  ])
+
+  // Create tube along the curve for the main bridge
+  const bridgeGeo = new THREE.TubeGeometry(archCurve, 20, 0.25, 8, false)
+
+  // Add rocky texture to the bridge
+  const bridgePos = bridgeGeo.attributes.position
+  for (let i = 0; i < bridgePos.count; i++) {
+    const x = bridgePos.getX(i)
+    const y = bridgePos.getY(i)
+    const z = bridgePos.getZ(i)
+    // More noise at the top, less at the base for stability
+    const noiseScale = 0.08 + (y / 1.5) * 0.06
+    bridgePos.setXYZ(i,
+      x + (seededRandom() - 0.5) * noiseScale,
+      y + (seededRandom() - 0.5) * noiseScale * 0.7,
+      z + (seededRandom() - 0.5) * noiseScale
+    )
+  }
+  bridgePos.needsUpdate = true
+  bridgeGeo.computeVertexNormals()
+  addGeometry(bridgeGeo)
+
+  // Left rock mass (base of arch)
+  const leftBase = new THREE.DodecahedronGeometry(0.45, 0)
+  leftBase.scale(1.0, 0.7, 0.8)
+  leftBase.translate(-0.9, 0.3, 0)
+  const leftPos = leftBase.attributes.position
   for (let i = 0; i < leftPos.count; i++) {
     const x = leftPos.getX(i)
     const y = leftPos.getY(i)
     const z = leftPos.getZ(i)
-    leftPos.setXYZ(i, x + (Math.random() - 0.5) * 0.1, y + (Math.random() - 0.5) * 0.05, z + (Math.random() - 0.5) * 0.1)
+    leftPos.setXYZ(i,
+      x + (seededRandom() - 0.5) * 0.1,
+      y + (seededRandom() - 0.5) * 0.08,
+      z + (seededRandom() - 0.5) * 0.1
+    )
   }
   leftPos.needsUpdate = true
-  leftPillar.computeVertexNormals()
-  addGeometry(leftPillar)
+  leftBase.computeVertexNormals()
+  addGeometry(leftBase)
 
-  // Right pillar
-  const rightPillar = new THREE.CylinderGeometry(0.25, 0.35, 1.5, 8)
-  rightPillar.translate(0.8, 0.75, 0)
-  const rightPos = rightPillar.attributes.position
+  // Right rock mass (base of arch)
+  const rightBase = new THREE.DodecahedronGeometry(0.45, 0)
+  rightBase.scale(1.0, 0.7, 0.8)
+  rightBase.translate(0.9, 0.3, 0)
+  const rightPos = rightBase.attributes.position
   for (let i = 0; i < rightPos.count; i++) {
     const x = rightPos.getX(i)
     const y = rightPos.getY(i)
     const z = rightPos.getZ(i)
-    rightPos.setXYZ(i, x + (Math.random() - 0.5) * 0.1, y + (Math.random() - 0.5) * 0.05, z + (Math.random() - 0.5) * 0.1)
+    rightPos.setXYZ(i,
+      x + (seededRandom() - 0.5) * 0.1,
+      y + (seededRandom() - 0.5) * 0.08,
+      z + (seededRandom() - 0.5) * 0.1
+    )
   }
   rightPos.needsUpdate = true
-  rightPillar.computeVertexNormals()
-  addGeometry(rightPillar)
+  rightBase.computeVertexNormals()
+  addGeometry(rightBase)
 
-  // Arch top (torus section)
-  const archTop = new THREE.TorusGeometry(0.8, 0.3, 8, 12, Math.PI)
-  archTop.rotateX(Math.PI / 2)
-  archTop.rotateZ(Math.PI / 2)
-  archTop.translate(0, 1.5, 0)
-  const archPos = archTop.attributes.position
-  for (let i = 0; i < archPos.count; i++) {
-    const x = archPos.getX(i)
-    const y = archPos.getY(i)
-    const z = archPos.getZ(i)
-    archPos.setXYZ(i, x + (Math.random() - 0.5) * 0.08, y + (Math.random() - 0.5) * 0.08, z + (Math.random() - 0.5) * 0.08)
-  }
-  archPos.needsUpdate = true
-  archTop.computeVertexNormals()
-  addGeometry(archTop)
+  // Small accent rocks
+  const accent1 = new THREE.OctahedronGeometry(0.15, 0)
+  accent1.translate(-0.5, 0.1, 0.2)
+  addGeometry(accent1)
 
-  // Base
-  const baseGeo = new THREE.BoxGeometry(2.2, 0.15, 0.8)
-  baseGeo.translate(0, 0.075, 0)
-  addGeometry(baseGeo)
+  const accent2 = new THREE.OctahedronGeometry(0.12, 0)
+  accent2.translate(0.6, 0.1, -0.15)
+  addGeometry(accent2)
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(allPositions, 3))
@@ -187,12 +284,10 @@ function createProceduralGeometry(type: ProceduralRockType): THREE.BufferGeometr
 }
 
 // Component for loaded 3D model rocks
-function ModelRockMesh({ rock, onSelect, onHover, isSelected, isDragging }: {
+function ModelRockMesh({ rock, onSelect, onHover }: {
   rock: RockMeshProps['rock']
   onSelect: () => void
   onHover: (hovered: boolean) => void
-  isSelected: boolean
-  isDragging: boolean
 }) {
   const { scene } = useGLTF(rock.modelPath!)
   const clonedScene = useMemo(() => scene.clone(), [scene])
@@ -216,7 +311,7 @@ function ModelRockMesh({ rock, onSelect, onHover, isSelected, isDragging }: {
       position={rock.position}
       rotation={rock.rotation}
       scale={rock.scale}
-      onClick={(e: THREE.Event) => {
+      onClick={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation()
         onSelect()
       }}
@@ -229,12 +324,12 @@ function ModelRockMesh({ rock, onSelect, onHover, isSelected, isDragging }: {
 // Component for procedural rocks
 function ProceduralRockMesh({ rock, meshRef, material, geometry, onPointerDown, onPointerUp, onPointerMove, onSelect, onHover }: {
   rock: RockMeshProps['rock']
-  meshRef: React.RefObject<THREE.Mesh>
+  meshRef: React.RefObject<THREE.Mesh | null>
   material: THREE.MeshStandardMaterial
   geometry: THREE.BufferGeometry
-  onPointerDown: (e: THREE.Event) => void
+  onPointerDown: (e: ThreeEvent<PointerEvent>) => void
   onPointerUp: () => void
-  onPointerMove: (e: THREE.Event) => void
+  onPointerMove: (e: ThreeEvent<PointerEvent>) => void
   onSelect: () => void
   onHover: (hovered: boolean) => void
 }) {
@@ -292,7 +387,8 @@ export function RockMesh({ rock }: RockMeshProps) {
     flatShading: true,
   }), [rock.color])
 
-  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -rock.position[1]), [rock.position[1]])
+  const rockY = rock.position[1]
+  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -rockY), [rockY])
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const mouse = useMemo(() => new THREE.Vector2(), [])
 
@@ -311,24 +407,27 @@ export function RockMesh({ rock }: RockMeshProps) {
     }
   })
 
-  const handlePointerDown = (e: THREE.Event) => {
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (!cameraLocked || !isSelected) return
     e.stopPropagation()
     setIsDragging(true)
+    // eslint-disable-next-line react-hooks/immutability
     gl.domElement.style.cursor = 'grabbing'
   }
 
   const handlePointerUp = () => {
     if (isDragging) {
       setIsDragging(false)
+      // eslint-disable-next-line react-hooks/immutability
       gl.domElement.style.cursor = 'auto'
     }
   }
 
-  const handlePointerMove = (e: THREE.Event) => {
+  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!isDragging || !cameraLocked) return
 
     const rect = gl.domElement.getBoundingClientRect()
+    // eslint-disable-next-line react-hooks/immutability
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
 
@@ -353,6 +452,7 @@ export function RockMesh({ rock }: RockMeshProps) {
     setHovered(h)
     if (!h) handlePointerUp()
     if (cameraLocked && isSelected) {
+      // eslint-disable-next-line react-hooks/immutability
       gl.domElement.style.cursor = h ? 'grab' : 'auto'
     }
   }
@@ -364,8 +464,6 @@ export function RockMesh({ rock }: RockMeshProps) {
           rock={rock}
           onSelect={handleSelect}
           onHover={handleHover}
-          isSelected={isSelected}
-          isDragging={isDragging}
         />
       </Suspense>
     )

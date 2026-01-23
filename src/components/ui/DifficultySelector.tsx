@@ -1,4 +1,4 @@
-import { useSimulationStore, DIFFICULTY_CONFIG, TIME_CONFIG } from '../../stores/simulationStore'
+import { useSimulationStore } from '../../stores/simulationStore'
 
 // Inline type to avoid Safari issues
 type Difficulty = 'beginner' | 'intermediate' | 'expert'

@@ -12,6 +12,7 @@ interface PlacedFish {
   rotation: [number, number, number]
   targetPosition: [number, number, number]
   scale: number
+  initialScale: number  // Original scale when fish was added (for growth cap)
   color: string
   swimSpeed: number
   // Simulation properties
@@ -79,6 +80,7 @@ export const useFishStore = create<FishState>((set) => ({
       rotation: [0, Math.random() * Math.PI * 2, 0],
       targetPosition,
       scale,
+      initialScale: scale, // Store original scale for growth calculations
       color,
       swimSpeed: fishInfo.swimSpeed * (0.8 + Math.random() * 0.4),
       // Initialize simulation properties
@@ -135,8 +137,11 @@ export const useFishStore = create<FishState>((set) => ({
       const growthRate = 0.001 * (1 - newHunger * 0.5) * (1 - newStress * 0.5) * deltaSimHours
       const newGrowth = Math.min(1, fish.growthProgress + growthRate)
 
-      // Scale increases slightly with growth
+      // Scale based on growth progress - up to 20% larger at full maturity
+      // Uses initialScale to prevent unbounded compounding
       const growthBonus = newGrowth * 0.2 // Up to 20% larger at full growth
+      const initialScale = fish.initialScale ?? fish.scale // Fallback for existing saves
+      const newScale = initialScale * (1 + growthBonus)
 
       return {
         ...fish,
@@ -145,7 +150,7 @@ export const useFishStore = create<FishState>((set) => ({
         stressLevel: newStress,
         age: newAge,
         growthProgress: newGrowth,
-        scale: fish.scale * (1 + growthBonus * 0.01), // Gradual scale increase
+        scale: newScale,
       }
     })
 

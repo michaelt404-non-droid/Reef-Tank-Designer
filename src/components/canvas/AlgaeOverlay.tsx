@@ -5,15 +5,24 @@ import { useTankStore } from '../../stores/tankStore'
 
 const TANK_SCALE = 0.1
 
+// Stable seed for texture generation
+const ALGAE_SEED = 12345
+
+// Seeded random number generator for deterministic patches
+function seededRandom(seed: number): () => number {
+  let currentSeed = seed
+  return () => {
+    currentSeed = (currentSeed * 9301 + 49297) % 233280
+    return currentSeed / 233280
+  }
+}
+
 export function AlgaeOverlay() {
   const mode = useSimulationStore((state) => state.mode)
   const algaeLevel = useSimulationStore((state) => state.algaeLevel)
   const { dimensions } = useTankStore()
 
-  // Only render in simulation mode with algae present
-  if (mode !== 'simulation' || algaeLevel < 0.05) return null
-
-  // Calculate tank dimensions
+  // Calculate tank dimensions - always call hooks before any returns
   const size = useMemo(() => ({
     x: dimensions.length * TANK_SCALE,
     y: dimensions.height * TANK_SCALE,
@@ -30,15 +39,18 @@ export function AlgaeOverlay() {
   }, [algaeLevel])
 
   // Opacity increases with algae level (max 0.6 for visibility)
-  const opacity = Math.min(0.6, algaeLevel * 0.8)
+  const opacity = useMemo(() => Math.min(0.6, algaeLevel * 0.8), [algaeLevel])
 
-  // Create a patchy texture for organic look
+  // Create a patchy texture for organic look using seeded random
   const algaeTexture = useMemo(() => {
     const canvas = document.createElement('canvas')
     canvas.width = 128
     canvas.height = 128
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
+
+    // Use seeded random for deterministic patches
+    const random = seededRandom(ALGAE_SEED)
 
     // Base transparent
     ctx.fillStyle = 'rgba(0,0,0,0)'
@@ -47,10 +59,10 @@ export function AlgaeOverlay() {
     // Add random patches of algae
     const patchCount = Math.floor(20 + algaeLevel * 80)
     for (let i = 0; i < patchCount; i++) {
-      const x = Math.random() * 128
-      const y = Math.random() * 128
-      const radius = 3 + Math.random() * 15 * algaeLevel
-      const alpha = 0.3 + Math.random() * 0.5
+      const x = random() * 128
+      const y = random() * 128
+      const radius = 3 + random() * 15 * algaeLevel
+      const alpha = 0.3 + random() * 0.5
 
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius)
       gradient.addColorStop(0, `rgba(60, 120, 40, ${alpha})`)
@@ -80,6 +92,9 @@ export function AlgaeOverlay() {
     blending: THREE.NormalBlending,
     depthWrite: false,
   }), [algaeColor, opacity, algaeTexture])
+
+  // Only render in simulation mode with algae present
+  if (mode !== 'simulation' || algaeLevel < 0.05) return null
 
   // Small offset to prevent z-fighting with glass
   const offset = 0.01

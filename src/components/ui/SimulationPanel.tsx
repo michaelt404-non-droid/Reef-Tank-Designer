@@ -13,7 +13,6 @@ export function SimulationPanel() {
   const resetSimulation = useSimulationStore((state) => state.resetSimulation)
   const mode = useSimulationStore((state) => state.mode)
   const setMode = useSimulationStore((state) => state.setMode)
-  const dayCount = useSimulationStore((state) => state.dayCount)
   const algaeLevel = useSimulationStore((state) => state.algaeLevel)
   const cleanGlass = useSimulationStore((state) => state.cleanGlass)
   const performWaterChange = useSimulationStore((state) => state.performWaterChange)

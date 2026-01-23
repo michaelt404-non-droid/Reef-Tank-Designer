@@ -65,15 +65,25 @@ const TIME_CONFIG = {
   },
 }
 
+// Difficulty config type
+interface DifficultyConfig {
+  algaeRate: number
+  decayRate: number
+  minHealth: number
+  recoveryRate: number
+  coralGrowthRate: number
+  showParams: readonly (keyof WaterParams)[]
+}
+
 // Difficulty modifiers
-const DIFFICULTY_CONFIG = {
+const DIFFICULTY_CONFIG: Record<Difficulty, DifficultyConfig> = {
   beginner: {
     algaeRate: 0.5,           // 50% slower
     decayRate: 0.5,           // 50% slower
     minHealth: 0.3,           // Nothing dies, min 30% health
     recoveryRate: 1.5,        // 50% faster recovery
     coralGrowthRate: 1.5,     // 50% faster growth
-    showParams: ['temperature', 'salinity', 'ph', 'nitrate'] as const,
+    showParams: ['temperature', 'salinity', 'ph', 'nitrate'],
   },
   intermediate: {
     algaeRate: 1.0,           // Normal rates
@@ -81,7 +91,7 @@ const DIFFICULTY_CONFIG = {
     minHealth: 0.25,          // Min 25% health
     recoveryRate: 1.0,
     coralGrowthRate: 1.0,
-    showParams: ['temperature', 'salinity', 'ph', 'nitrate', 'ammonia', 'nitrite', 'phosphate', 'alkalinity'] as const,
+    showParams: ['temperature', 'salinity', 'ph', 'nitrate', 'ammonia', 'nitrite', 'phosphate', 'alkalinity'],
   },
   expert: {
     algaeRate: 1.2,           // 20% faster
@@ -89,7 +99,7 @@ const DIFFICULTY_CONFIG = {
     minHealth: 0,             // Things can die
     recoveryRate: 0.8,        // 20% slower recovery
     coralGrowthRate: 0.8,     // 20% slower growth
-    showParams: ['temperature', 'salinity', 'ph', 'nitrate', 'ammonia', 'nitrite', 'phosphate', 'alkalinity', 'calcium', 'magnesium', 'potassium', 'strontium'] as const,
+    showParams: ['temperature', 'salinity', 'ph', 'nitrate', 'ammonia', 'nitrite', 'phosphate', 'alkalinity', 'calcium', 'magnesium', 'potassium', 'strontium'],
   },
 }
 
@@ -171,7 +181,7 @@ interface SimulationState {
 
   // Getters
   getTimeConfig: () => typeof TIME_CONFIG.beginner
-  getDifficultyConfig: () => typeof DIFFICULTY_CONFIG.beginner
+  getDifficultyConfig: () => DifficultyConfig
   getParamStatus: (param: keyof WaterParams) => 'optimal' | 'acceptable' | 'warning' | 'critical'
 }
 
@@ -250,7 +260,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     const newProgress = cycleTimeReal / totalCycleReal
 
     // Determine time of day
-    let newTimeOfDay: TimeOfDay = newProgress < dayRatio ? 'day' : 'night'
+    const newTimeOfDay: TimeOfDay = newProgress < dayRatio ? 'day' : 'night'
     let newDayCount = state.dayCount
 
     // Check for day transition
