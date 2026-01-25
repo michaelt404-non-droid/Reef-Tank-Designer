@@ -48,19 +48,27 @@ export function getTankBounds(dimensions: { length: number; width: number; heigh
 }
 
 // Clamp a rock position to stay within tank bounds
+// isModelRock: GLB models typically have origin at bottom, procedural rocks have origin at center
 export function clampRockPosition(
   position: [number, number, number],
   rockBounds: RockBounds,
-  tankBounds: ReturnType<typeof getTankBounds>
+  tankBounds: ReturnType<typeof getTankBounds>,
+  isModelRock: boolean = false
 ): [number, number, number] {
   const margin = 0.05 // Small margin from glass
+  const sandBedHeight = 0.12 // Height of sand bed (matches Tank.tsx)
 
   const minX = -tankBounds.halfX + rockBounds.halfX + margin
   const maxX = tankBounds.halfX - rockBounds.halfX - margin
   const minZ = -tankBounds.halfZ + rockBounds.halfZ + margin
   const maxZ = tankBounds.halfZ - rockBounds.halfZ - margin
-  const minY = rockBounds.halfY // Keep rock above sand bed
-  const maxY = tankBounds.height - rockBounds.halfY - margin
+
+  // For model rocks (GLB), origin is at the bottom, so position.y IS the bottom
+  // For procedural rocks, origin is at center, so position.y - halfY is the bottom
+  const minY = isModelRock ? sandBedHeight : sandBedHeight + rockBounds.halfY
+  const maxY = isModelRock
+    ? tankBounds.height - rockBounds.halfY * 2 - margin
+    : tankBounds.height - rockBounds.halfY - margin
 
   return [
     Math.max(minX, Math.min(maxX, position[0])),

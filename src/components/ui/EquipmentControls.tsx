@@ -1,5 +1,10 @@
+import { useMemo } from 'react'
 import { useEquipmentStore } from '../../stores/equipmentStore'
+import { useTankStore } from '../../stores/tankStore'
+import { useHistoryStore } from '../../stores/historyStore'
 import { EQUIPMENT_INFO } from '../../data/equipment'
+
+const TANK_SCALE = 0.1
 
 export function EquipmentControls() {
   const equipment = useEquipmentStore((state) => state.equipment)
@@ -8,8 +13,36 @@ export function EquipmentControls() {
   const removeEquipment = useEquipmentStore((state) => state.removeEquipment)
   const showSumpEquipment = useEquipmentStore((state) => state.showSumpEquipment)
   const toggleSumpVisibility = useEquipmentStore((state) => state.toggleSumpVisibility)
+  const tankDimensions = useTankStore((state) => state.dimensions)
 
   const selectedEquipment = equipment.find(e => e.id === selectedEquipmentId)
+  const equipmentInfo = selectedEquipment
+    ? EQUIPMENT_INFO.find(i => i.id === selectedEquipment.equipmentInfoId)
+    : null
+
+  // Calculate position bounds based on tank size and equipment size
+  // Must be called unconditionally (before any early returns)
+  const bounds = useMemo(() => {
+    const tankHalfLength = (tankDimensions.length * TANK_SCALE) / 2
+    const tankHalfWidth = (tankDimensions.width * TANK_SCALE) / 2
+    const tankHeight = tankDimensions.height * TANK_SCALE
+
+    const scale = selectedEquipment?.scale || 1
+    const eqWidth = (equipmentInfo?.size.width || 2) * TANK_SCALE * scale
+    const eqHeight = (equipmentInfo?.size.height || 2) * TANK_SCALE * scale
+    const eqDepth = (equipmentInfo?.size.depth || 2) * TANK_SCALE * scale
+
+    const wallMargin = 0.02
+
+    return {
+      minX: -tankHalfLength + eqWidth / 2 + wallMargin,
+      maxX: tankHalfLength - eqWidth / 2 - wallMargin,
+      minY: eqHeight / 2 + 0.02,
+      maxY: tankHeight - eqHeight / 2 - wallMargin,
+      minZ: -tankHalfWidth + eqDepth / 2 + wallMargin,
+      maxZ: tankHalfWidth - eqDepth / 2 - wallMargin,
+    }
+  }, [tankDimensions, equipmentInfo, selectedEquipment?.scale])
 
   if (!selectedEquipment) {
     // Show sump visibility toggle even without selection
@@ -43,8 +76,6 @@ export function EquipmentControls() {
     )
   }
 
-  const equipmentInfo = EQUIPMENT_INFO.find(i => i.id === selectedEquipment.equipmentInfoId)
-
   const handlePositionChange = (axis: 0 | 1 | 2, value: number) => {
     const newPosition: [number, number, number] = [...selectedEquipment.position]
     newPosition[axis] = value
@@ -55,6 +86,36 @@ export function EquipmentControls() {
     updateEquipment(selectedEquipment.id, {
       rotation: [0, value, 0],
     })
+  }
+
+  const handleScaleChange = (value: number) => {
+    // Recalculate bounds with new scale and clamp position
+    const tankHalfLength = (tankDimensions.length * TANK_SCALE) / 2
+    const tankHalfWidth = (tankDimensions.width * TANK_SCALE) / 2
+    const tankHeight = tankDimensions.height * TANK_SCALE
+
+    const eqWidth = (equipmentInfo?.size.width || 2) * TANK_SCALE * value
+    const eqHeight = (equipmentInfo?.size.height || 2) * TANK_SCALE * value
+    const eqDepth = (equipmentInfo?.size.depth || 2) * TANK_SCALE * value
+
+    const wallMargin = 0.02
+    const newBounds = {
+      minX: -tankHalfLength + eqWidth / 2 + wallMargin,
+      maxX: tankHalfLength - eqWidth / 2 - wallMargin,
+      minY: eqHeight / 2 + 0.02,
+      maxY: tankHeight - eqHeight / 2 - wallMargin,
+      minZ: -tankHalfWidth + eqDepth / 2 + wallMargin,
+      maxZ: tankHalfWidth - eqDepth / 2 - wallMargin,
+    }
+
+    // Clamp current position to new bounds
+    const clampedPosition: [number, number, number] = [
+      Math.max(newBounds.minX, Math.min(newBounds.maxX, selectedEquipment.position[0])),
+      Math.max(newBounds.minY, Math.min(newBounds.maxY, selectedEquipment.position[1])),
+      Math.max(newBounds.minZ, Math.min(newBounds.maxZ, selectedEquipment.position[2])),
+    ]
+
+    updateEquipment(selectedEquipment.id, { scale: value, position: clampedPosition })
   }
 
   const handleVisibilityToggle = () => {
@@ -73,7 +134,10 @@ export function EquipmentControls() {
           )}
         </div>
         <button
-          onClick={() => removeEquipment(selectedEquipment.id)}
+          onClick={() => {
+            removeEquipment(selectedEquipment.id)
+            useHistoryStore.getState().pushSnapshot('Delete Equipment')
+          }}
           className="p-1.5 bg-red-600/50 hover:bg-red-600 rounded transition-colors"
           title="Delete equipment"
         >
@@ -86,15 +150,15 @@ export function EquipmentControls() {
       {/* Position X (left/right) */}
       <div>
         <label className="flex items-center justify-between text-xs text-gray-400 mb-1">
-          <span>Position X</span>
+          <span>Left / Right</span>
           <span>{selectedEquipment.position[0].toFixed(2)}</span>
         </label>
         <input
           type="range"
-          min="-2"
-          max="2"
-          step="0.05"
-          value={selectedEquipment.position[0]}
+          min={bounds.minX}
+          max={bounds.maxX}
+          step="0.02"
+          value={Math.max(bounds.minX, Math.min(bounds.maxX, selectedEquipment.position[0]))}
           onChange={(e) => handlePositionChange(0, parseFloat(e.target.value))}
           className="w-full h-1.5 bg-gray-600 rounded-full appearance-none cursor-pointer accent-blue-500"
         />
@@ -108,10 +172,10 @@ export function EquipmentControls() {
         </label>
         <input
           type="range"
-          min="0"
-          max="2"
-          step="0.05"
-          value={selectedEquipment.position[1]}
+          min={bounds.minY}
+          max={bounds.maxY}
+          step="0.02"
+          value={Math.max(bounds.minY, Math.min(bounds.maxY, selectedEquipment.position[1]))}
           onChange={(e) => handlePositionChange(1, parseFloat(e.target.value))}
           className="w-full h-1.5 bg-gray-600 rounded-full appearance-none cursor-pointer accent-blue-500"
         />
@@ -120,15 +184,15 @@ export function EquipmentControls() {
       {/* Position Z (front/back) */}
       <div>
         <label className="flex items-center justify-between text-xs text-gray-400 mb-1">
-          <span>Position Z</span>
+          <span>Front / Back</span>
           <span>{selectedEquipment.position[2].toFixed(2)}</span>
         </label>
         <input
           type="range"
-          min="-2"
-          max="2"
-          step="0.05"
-          value={selectedEquipment.position[2]}
+          min={bounds.minZ}
+          max={bounds.maxZ}
+          step="0.02"
+          value={Math.max(bounds.minZ, Math.min(bounds.maxZ, selectedEquipment.position[2]))}
           onChange={(e) => handlePositionChange(2, parseFloat(e.target.value))}
           className="w-full h-1.5 bg-gray-600 rounded-full appearance-none cursor-pointer accent-blue-500"
         />
@@ -147,6 +211,23 @@ export function EquipmentControls() {
           step="0.1"
           value={selectedEquipment.rotation[1]}
           onChange={(e) => handleRotationChange(parseFloat(e.target.value))}
+          className="w-full h-1.5 bg-gray-600 rounded-full appearance-none cursor-pointer accent-blue-500"
+        />
+      </div>
+
+      {/* Scale */}
+      <div>
+        <label className="flex items-center justify-between text-xs text-gray-400 mb-1">
+          <span>Size</span>
+          <span>{Math.round(selectedEquipment.scale * 100)}%</span>
+        </label>
+        <input
+          type="range"
+          min="0.2"
+          max="1.5"
+          step="0.05"
+          value={selectedEquipment.scale}
+          onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
           className="w-full h-1.5 bg-gray-600 rounded-full appearance-none cursor-pointer accent-blue-500"
         />
       </div>

@@ -1,5 +1,5 @@
 // Equipment types for reef tanks
-const EQUIPMENT_TYPES = ['pump', 'heater', 'skimmer', 'powerhead', 'wavemaker', 'ato'] as const
+const EQUIPMENT_TYPES = ['pump', 'heater', 'skimmer', 'wavemaker', 'ato'] as const
 type EquipmentType = typeof EQUIPMENT_TYPES[number]
 
 interface EquipmentInfo {
@@ -13,6 +13,7 @@ interface EquipmentInfo {
   minTankSize: number // gallons
   placement: 'internal' | 'external' | 'both'
   defaultPosition: 'back' | 'side' | 'sump' | 'corner'
+  modelPath?: string // Path to GLB model
 }
 
 export const EQUIPMENT_INFO: EquipmentInfo[] = [
@@ -51,6 +52,7 @@ export const EQUIPMENT_INFO: EquipmentInfo[] = [
     minTankSize: 10,
     placement: 'internal',
     defaultPosition: 'back',
+    modelPath: '/models/equipment/heater.glb',
   },
   {
     id: 'heater-200w',
@@ -62,6 +64,7 @@ export const EQUIPMENT_INFO: EquipmentInfo[] = [
     minTankSize: 30,
     placement: 'internal',
     defaultPosition: 'back',
+    modelPath: '/models/equipment/heater.glb',
   },
   {
     id: 'heater-300w',
@@ -73,6 +76,7 @@ export const EQUIPMENT_INFO: EquipmentInfo[] = [
     minTankSize: 60,
     placement: 'internal',
     defaultPosition: 'back',
+    modelPath: '/models/equipment/heater.glb',
   },
 
   // Protein Skimmers
@@ -86,6 +90,7 @@ export const EQUIPMENT_INFO: EquipmentInfo[] = [
     minTankSize: 10,
     placement: 'both',
     defaultPosition: 'back',
+    modelPath: '/models/equipment/skimmer.glb',
   },
   {
     id: 'skimmer-medium',
@@ -97,6 +102,7 @@ export const EQUIPMENT_INFO: EquipmentInfo[] = [
     minTankSize: 50,
     placement: 'external',
     defaultPosition: 'sump',
+    modelPath: '/models/equipment/skimmer.glb',
   },
   {
     id: 'skimmer-large',
@@ -108,30 +114,33 @@ export const EQUIPMENT_INFO: EquipmentInfo[] = [
     minTankSize: 100,
     placement: 'external',
     defaultPosition: 'sump',
+    modelPath: '/models/equipment/skimmer.glb',
   },
 
-  // Powerheads / Wavemakers
+  // Wavemakers (includes powerheads)
   {
-    id: 'powerhead-small',
-    type: 'powerhead',
-    name: 'Powerhead (Small)',
+    id: 'wavemaker-small',
+    type: 'wavemaker',
+    name: 'Wavemaker (Small)',
     description: '500 GPH flow',
     size: { width: 2, height: 2, depth: 3 },
     color: '#222222',
     minTankSize: 10,
     placement: 'internal',
     defaultPosition: 'side',
+    modelPath: '/models/equipment/wavemaker.glb',
   },
   {
-    id: 'powerhead-medium',
-    type: 'powerhead',
-    name: 'Powerhead (Medium)',
+    id: 'wavemaker-medium',
+    type: 'wavemaker',
+    name: 'Wavemaker (Medium)',
     description: '1500 GPH flow',
     size: { width: 3, height: 3, depth: 4 },
     color: '#222222',
     minTankSize: 40,
     placement: 'internal',
     defaultPosition: 'side',
+    modelPath: '/models/equipment/wavemaker.glb',
   },
   {
     id: 'wavemaker-gyre',
@@ -143,6 +152,7 @@ export const EQUIPMENT_INFO: EquipmentInfo[] = [
     minTankSize: 50,
     placement: 'internal',
     defaultPosition: 'side',
+    modelPath: '/models/equipment/wavemaker.glb',
   },
 
   // ATO (Auto Top Off)
@@ -175,7 +185,6 @@ export function getEquipmentTypeLabel(type: EquipmentType): string {
     pump: 'Return Pumps',
     heater: 'Heaters',
     skimmer: 'Protein Skimmers',
-    powerhead: 'Powerheads',
     wavemaker: 'Wavemakers',
     ato: 'Auto Top-Off',
   }

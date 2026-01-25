@@ -1,10 +1,17 @@
-import { useRef, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useRef, useMemo, useEffect, Suspense } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import type { ThreeEvent } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useEquipmentStore } from '../../stores/equipmentStore'
+import { useUIStore } from '../../stores/uiStore'
+import { useTankStore } from '../../stores/tankStore'
+import { useSimulationStore } from '../../stores/simulationStore'
+import { useHistoryStore } from '../../stores/historyStore'
 import { EQUIPMENT_INFO } from '../../data/equipment'
+import { useDrag3D } from '../../hooks/useDrag3D'
 
-type EquipmentType = 'pump' | 'heater' | 'skimmer' | 'powerhead' | 'wavemaker' | 'ato'
+type EquipmentType = 'pump' | 'heater' | 'skimmer' | 'wavemaker' | 'ato'
 
 interface EquipmentMeshProps {
   equipment: {
@@ -96,10 +103,12 @@ function createEquipmentGeometry(type: EquipmentType, size: { width: number; hei
       return createPumpGeometry(size)
     case 'skimmer':
       return createSkimmerGeometry(size)
-    case 'powerhead':
-      return createPowerheadGeometry(size)
     case 'wavemaker':
-      return createWavemakerGeometry(size)
+      // Use gyre (cylindrical) geometry for long wavemakers, compact (spherical) for smaller ones
+      if (size.depth > size.width * 2) {
+        return createWavemakerGeometry(size)
+      }
+      return createPowerheadGeometry(size)
     case 'ato':
       return createATOGeometry(size)
     default:
@@ -107,12 +116,87 @@ function createEquipmentGeometry(type: EquipmentType, size: { width: number; hei
   }
 }
 
+// Component for rendering GLB model equipment
+function ModelEquipment({
+  modelPath,
+  position,
+  rotation,
+  scale,
+  isSelected,
+  onClick,
+  onPointerDown,
+  onHover,
+}: {
+  modelPath: string
+  position: [number, number, number]
+  rotation: [number, number, number]
+  scale: number
+  isSelected: boolean
+  onClick: (e: ThreeEvent<MouseEvent>) => void
+  onPointerDown: (e: ThreeEvent<PointerEvent>) => void
+  onHover: (h: boolean) => void
+}) {
+  const { scene } = useGLTF(modelPath)
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone()
+    clone.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        // Clone materials to preserve original textures and avoid modifying cached materials
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material = child.material.map(mat => {
+              const clonedMat = mat.clone()
+              clonedMat.side = THREE.DoubleSide
+              return clonedMat
+            })
+          } else {
+            child.material = child.material.clone()
+            child.material.side = THREE.DoubleSide
+          }
+        }
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
+    return clone
+  }, [scene])
+
+  return (
+    <group>
+      <primitive
+        object={clonedScene}
+        position={position}
+        rotation={rotation}
+        scale={scale}
+        onClick={onClick}
+        onPointerDown={onPointerDown}
+        onPointerOver={() => onHover(true)}
+        onPointerOut={() => onHover(false)}
+      />
+      {/* Selection indicator */}
+      {isSelected && (
+        <mesh position={[position[0], position[1] + 0.3, position[2]]}>
+          <sphereGeometry args={[0.06, 8, 8]} />
+          <meshBasicMaterial color="#22c55e" />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
 export function EquipmentMesh({ equipment }: EquipmentMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null)
 
+  const { gl } = useThree()
+
   const selectedEquipmentId = useEquipmentStore((state) => state.selectedEquipmentId)
   const selectEquipment = useEquipmentStore((state) => state.selectEquipment)
+  const updateEquipment = useEquipmentStore((state) => state.updateEquipment)
   const showSumpEquipment = useEquipmentStore((state) => state.showSumpEquipment)
+  const cameraLocked = useUIStore((state) => state.cameraLocked)
+  const tankDimensions = useTankStore((state) => state.dimensions)
+  const mode = useSimulationStore((state) => state.mode)
+  const isSimulationMode = mode === 'simulation'
 
   const isSelected = selectedEquipmentId === equipment.id
 
@@ -120,45 +204,141 @@ export function EquipmentMesh({ equipment }: EquipmentMeshProps) {
     return EQUIPMENT_INFO.find(e => e.id === equipment.equipmentInfoId)
   }, [equipment.equipmentInfoId])
 
+  // Calculate bounds for dragging - keeps equipment inside tank walls
+  const dragBounds = useMemo(() => {
+    const tankHalfLength = (tankDimensions.length * TANK_SCALE) / 2
+    const tankHalfWidth = (tankDimensions.width * TANK_SCALE) / 2
+    const tankHeight = tankDimensions.height * TANK_SCALE
+
+    // Account for equipment size (scaled) to keep it inside the tank
+    const eqWidth = (equipmentInfo?.size.width || 2) * TANK_SCALE * equipment.scale
+    const eqHeight = (equipmentInfo?.size.height || 2) * TANK_SCALE * equipment.scale
+    const eqDepth = (equipmentInfo?.size.depth || 2) * TANK_SCALE * equipment.scale
+
+    const wallMargin = 0.02 // Small gap from glass
+
+    return {
+      minX: -tankHalfLength + eqWidth / 2 + wallMargin,
+      maxX: tankHalfLength - eqWidth / 2 - wallMargin,
+      minY: eqHeight / 2 + 0.02, // Keep above sand
+      maxY: tankHeight - eqHeight / 2 - wallMargin,
+      minZ: -tankHalfWidth + eqDepth / 2 + wallMargin,
+      maxZ: tankHalfWidth - eqDepth / 2 - wallMargin,
+    }
+  }, [tankDimensions, equipmentInfo, equipment.scale])
+
+  // Use the drag hook
+  const { startDrag, canDrag } = useDrag3D({
+    position: equipment.position,
+    onDrag: (newPosition) => updateEquipment(equipment.id, { position: newPosition }),
+    onDragEnd: () => useHistoryStore.getState().pushSnapshot('Move Equipment'),
+    enabled: isSelected,
+    bounds: dragBounds,
+  })
+
   const geometry = useMemo(() => {
     if (!equipmentInfo) return new THREE.BoxGeometry(0.1, 0.1, 0.1)
     return createEquipmentGeometry(equipment.type, equipmentInfo.size)
   }, [equipment.type, equipmentInfo])
 
   const material = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
+    return new THREE.MeshLambertMaterial({
       color: equipment.color,
-      roughness: 0.3,
-      metalness: 0.7,
+      flatShading: true,
     })
   }, [equipment.color])
+
+  // Dispose geometry and material on unmount or when they change
+  useEffect(() => {
+    return () => {
+      geometry.dispose()
+      material.dispose()
+    }
+  }, [geometry, material])
 
   // Highlight when selected
   useFrame(() => {
     if (meshRef.current) {
-      const mat = meshRef.current.material as THREE.MeshStandardMaterial
-      mat.emissive.setHex(isSelected ? 0x222266 : 0x000000)
+      const mat = meshRef.current.material as THREE.MeshLambertMaterial
+      if (isSelected) {
+        mat.emissive.setHex(0x333366)
+      } else {
+        mat.emissive.setHex(0x000000)
+      }
     }
   })
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (isSimulationMode) return
+    e.stopPropagation()
+    // Select on pointer down if not already selected
+    if (!isSelected) {
+      selectEquipment(equipment.id)
+    }
+    // Start drag if camera is locked
+    if (cameraLocked) {
+      startDrag(e)
+    }
+  }
+
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (isSimulationMode) return
+    e.stopPropagation()
+    selectEquipment(equipment.id)
+  }
+
+  const handleHover = (h: boolean) => {
+    if (canDrag) {
+      gl.domElement.style.cursor = h ? 'grab' : 'auto'
+    }
+  }
 
   // Check visibility
   const shouldShow = equipment.visible || (equipmentInfo?.placement === 'external' && showSumpEquipment)
   if (!shouldShow) return null
 
+  // Render GLB model if available
+  if (equipmentInfo?.modelPath) {
+    return (
+      <Suspense fallback={null}>
+        <ModelEquipment
+          modelPath={equipmentInfo.modelPath}
+          position={equipment.position}
+          rotation={equipment.rotation}
+          scale={equipment.scale}
+          isSelected={isSelected}
+          onClick={handleClick}
+          onPointerDown={handlePointerDown}
+          onHover={handleHover}
+        />
+      </Suspense>
+    )
+  }
+
+  // Fallback to procedural geometry
   return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={material}
-      position={equipment.position}
-      rotation={equipment.rotation}
-      scale={equipment.scale}
-      onClick={(e) => {
-        e.stopPropagation()
-        selectEquipment(equipment.id)
-      }}
-      castShadow
-      receiveShadow
-    />
+    <group>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        material={material}
+        position={equipment.position}
+        rotation={equipment.rotation}
+        scale={equipment.scale}
+        onClick={handleClick}
+        onPointerDown={handlePointerDown}
+        onPointerOver={() => handleHover(true)}
+        onPointerOut={() => handleHover(false)}
+        castShadow
+        receiveShadow
+      />
+      {/* Selection indicator */}
+      {isSelected && (
+        <mesh position={[equipment.position[0], equipment.position[1] + 0.3, equipment.position[2]]}>
+          <sphereGeometry args={[0.06, 8, 8]} />
+          <meshBasicMaterial color="#22c55e" />
+        </mesh>
+      )}
+    </group>
   )
 }

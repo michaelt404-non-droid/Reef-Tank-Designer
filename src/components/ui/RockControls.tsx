@@ -1,6 +1,7 @@
 import { useRockStore } from '../../stores/rockStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTankStore } from '../../stores/tankStore'
+import { useHistoryStore } from '../../stores/historyStore'
 import { getMaxScale, getRockBounds, getTankBounds, clampRockPosition } from '../../utils/rockBounds'
 
 export function RockControls() {
@@ -52,7 +53,10 @@ export function RockControls() {
               {selectedRock.type}
             </span>
             <button
-              onClick={() => removeRock(selectedRock.id)}
+              onClick={() => {
+                removeRock(selectedRock.id)
+                useHistoryStore.getState().pushSnapshot('Delete Rock')
+              }}
               className="px-2 py-1 text-xs bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded"
             >
               Delete
@@ -74,10 +78,12 @@ export function RockControls() {
                 // Clamp full position after height change
                 const rockBounds = getRockBounds(selectedRock.type, selectedRock.proceduralType, selectedRock.scale)
                 const tankBounds = getTankBounds(tankDimensions)
+                const isModelRock = selectedRock.type === 'model'
                 const clampedPosition = clampRockPosition(
                   [selectedRock.position[0], newY, selectedRock.position[2]],
                   rockBounds,
-                  tankBounds
+                  tankBounds,
+                  isModelRock
                 )
                 updateRock(selectedRock.id, { position: clampedPosition })
               }}
@@ -103,7 +109,8 @@ export function RockControls() {
                 // After scale change, clamp position to stay in bounds
                 const rockBounds = getRockBounds(selectedRock.type, selectedRock.proceduralType, newScale)
                 const tankBounds = getTankBounds(tankDimensions)
-                const clampedPosition = clampRockPosition(selectedRock.position, rockBounds, tankBounds)
+                const isModelRock = selectedRock.type === 'model'
+                const clampedPosition = clampRockPosition(selectedRock.position, rockBounds, tankBounds, isModelRock)
                 updateRock(selectedRock.id, { scale: newScale, position: clampedPosition })
               }}
               className="w-full accent-cyan-500"
@@ -129,31 +136,6 @@ export function RockControls() {
             />
           </div>
 
-          {/* Color Picker */}
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Color</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={selectedRock.color}
-                onChange={(e) => updateRock(selectedRock.id, { color: e.target.value })}
-                className="w-10 h-8 rounded cursor-pointer border border-gray-600"
-              />
-              <span className="text-xs text-gray-400 font-mono">{selectedRock.color}</span>
-            </div>
-            {/* Quick color presets for rocks */}
-            <div className="flex gap-1 mt-2">
-              {['#8B7355', '#6B5344', '#9C8B7A', '#5C4D3D', '#A89B8B', '#4A3728', '#7A6B5A'].map((color, i) => (
-                <button
-                  key={i}
-                  onClick={() => updateRock(selectedRock.id, { color })}
-                  className="w-6 h-6 rounded border border-gray-600 hover:border-white transition-colors"
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </div>

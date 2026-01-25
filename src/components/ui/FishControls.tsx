@@ -1,4 +1,5 @@
 import { useFishStore } from '../../stores/fishStore'
+import { useHistoryStore } from '../../stores/historyStore'
 import { FISH_INFO } from '../../data/fish'
 
 export function FishControls() {
@@ -25,7 +26,10 @@ export function FishControls() {
           <div className="text-xs text-gray-400">{fishInfo?.description}</div>
         </div>
         <button
-          onClick={() => removeFish(selectedFish.id)}
+          onClick={() => {
+            removeFish(selectedFish.id)
+            useHistoryStore.getState().pushSnapshot('Remove Fish')
+          }}
           className="px-2 py-1 text-xs bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded"
         >
           Remove

@@ -9,9 +9,18 @@ import { getRockBounds } from '../utils/rockBounds'
 // Inline type to avoid Safari import issues
 type CoralType = 'mushrooms' | 'zoanthids' | 'softCorals' | 'lps' | 'sps' | 'acropora'
 
+interface CoralInfo {
+  id: string
+  name: string
+  description: string
+  baseScale: number
+  baseColors: string[]
+  modelPath: string
+}
+
 interface PlacedCoral {
   id: string
-  coralType: CoralType
+  coralType: CoralType | string  // Allow both for custom corals
   position: [number, number, number]
   rotation: [number, number, number]
   scale: number
@@ -25,8 +34,10 @@ interface PlacedCoral {
 
 interface CoralState {
   corals: PlacedCoral[]
+  customCoralModels: CoralInfo[]
   selectedCoralId: string | null
-  addCoral: (coralType: CoralType) => void
+  addCoral: (coralType: string) => void
+  addCustomCoralModel: (name: string, modelPath: string) => void
   removeCoral: (id: string) => void
   updateCoral: (id: string, updates: Partial<PlacedCoral>) => void
   selectCoral: (id: string | null) => void
@@ -58,14 +69,14 @@ function distance3D(a: [number, number, number], b: [number, number, number]): n
 // Check if a position collides with existing corals
 function collidesWithCorals(
   position: [number, number, number],
-  coralType: CoralType,
+  coralType: CoralType | string,
   scale: number,
   existingCorals: PlacedCoral[]
 ): boolean {
-  const newRadius = CORAL_COLLISION_RADIUS[coralType] * scale
+  const newRadius = (CORAL_COLLISION_RADIUS[coralType as CoralType] ?? 0.15) * scale
 
   for (const coral of existingCorals) {
-    const existingRadius = CORAL_COLLISION_RADIUS[coral.coralType] * coral.scale
+    const existingRadius = (CORAL_COLLISION_RADIUS[coral.coralType as CoralType] ?? 0.15) * coral.scale
     const minDistance = newRadius + existingRadius
     const actualDistance = distance3D(position, coral.position)
 
@@ -107,12 +118,12 @@ function isInsideRock(
 // Try to find a non-colliding position near the original
 function findNonCollidingPosition(
   originalPosition: [number, number, number],
-  coralType: CoralType,
+  coralType: CoralType | string,
   scale: number,
   existingCorals: PlacedCoral[],
   rocks: ReturnType<typeof useRockStore.getState>['rocks']
 ): [number, number, number] | null {
-  const radius = CORAL_COLLISION_RADIUS[coralType] * scale
+  const radius = (CORAL_COLLISION_RADIUS[coralType as CoralType] ?? 0.15) * scale
   const searchRadius = radius * 4
   const attempts = 20
 
@@ -142,13 +153,13 @@ function findNonCollidingPosition(
 
 // Find valid positions on rocks for a coral based on PAR requirements
 function findValidRockPositions(
-  coralType: CoralType,
+  coralType: CoralType | string,
   scale: number,
   rocks: ReturnType<typeof useRockStore.getState>['rocks'],
   lights: ReturnType<typeof useLightStore.getState>['lights'],
   existingCorals: PlacedCoral[]
 ): { position: [number, number, number]; par: number }[] {
-  const parReq = CORAL_PAR_REQUIREMENTS[coralType]
+  const parReq = CORAL_PAR_REQUIREMENTS[coralType as CoralType] ?? { min: 50, optimal: 150, max: 300 }
   const validPositions: { position: [number, number, number]; par: number }[] = []
 
   for (const rock of rocks) {
@@ -223,10 +234,11 @@ function findValidRockPositions(
 
 export const useCoralStore = create<CoralState>((set) => ({
   corals: [],
+  customCoralModels: [],
   selectedCoralId: null,
 
   addCoral: (coralType) => set((state) => {
-    const coralInfo = CORAL_INFO.find(c => c.id === coralType)
+    const coralInfo = [...CORAL_INFO, ...state.customCoralModels].find(c => c.id === coralType)
     if (!coralInfo) return state
 
     // Get rocks and lights for PAR-aware placement
@@ -340,6 +352,18 @@ export const useCoralStore = create<CoralState>((set) => ({
     return { corals: [...state.corals, newCoral] }
   }),
 
+  addCustomCoralModel: (name, modelPath) => set((state) => {
+    const newModel: CoralInfo = {
+      id: `coral-model-${generateId()}`,
+      name,
+      description: 'Custom 3D model',
+      baseScale: 0.15,
+      baseColors: ['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4'],
+      modelPath,
+    }
+    return { customCoralModels: [...state.customCoralModels, newModel] }
+  }),
+
   removeCoral: (id) => set((state) => ({
     corals: state.corals.filter(c => c.id !== id),
     selectedCoralId: state.selectedCoralId === id ? null : state.selectedCoralId,
@@ -366,7 +390,7 @@ export const useCoralStore = create<CoralState>((set) => ({
       })
 
       // Get PAR requirements for this coral type
-      const parReq = CORAL_PAR_REQUIREMENTS[coral.coralType]
+      const parReq = CORAL_PAR_REQUIREMENTS[coral.coralType as CoralType] ?? { min: 50, optimal: 150, max: 300 }
 
       // Calculate PAR factor (how well-suited the light is)
       let parFactor = 1.0

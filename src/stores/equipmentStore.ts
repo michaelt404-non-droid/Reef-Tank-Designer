@@ -3,7 +3,7 @@ import { useTankStore } from './tankStore'
 import { EQUIPMENT_INFO } from '../data/equipment'
 
 // Inline types to avoid Safari import issues
-type EquipmentType = 'pump' | 'heater' | 'skimmer' | 'powerhead' | 'wavemaker' | 'ato'
+type EquipmentType = 'pump' | 'heater' | 'skimmer' | 'wavemaker' | 'ato'
 
 interface PlacedEquipment {
   id: string
@@ -32,42 +32,61 @@ interface EquipmentState {
 const generateId = () => Math.random().toString(36).substring(2, 9)
 const TANK_SCALE = 0.1
 
+// Calculate equipment scale proportional to tank size
+// Base scale assumes a ~48" tank, scale up/down from there
+function getEquipmentScale(
+  tankDimensions: { length: number; width: number; height: number }
+): number {
+  const baselineTankSize = 48 // inches - a standard 4ft tank
+  const tankSize = Math.min(tankDimensions.length, tankDimensions.width)
+  // Scale proportionally, with a reasonable range (0.3 to 1.5)
+  const scale = Math.max(0.3, Math.min(1.5, tankSize / baselineTankSize))
+  return scale
+}
+
 // Calculate position within tank based on equipment placement preference
+// Keeps equipment inside the tank walls
 function getEquipmentPosition(
   equipmentInfo: typeof EQUIPMENT_INFO[number],
-  tankDimensions: { length: number; width: number; height: number }
+  tankDimensions: { length: number; width: number; height: number },
+  equipmentScale: number
 ): [number, number, number] {
   const tankHalfLength = (tankDimensions.length * TANK_SCALE) / 2
   const tankHalfWidth = (tankDimensions.width * TANK_SCALE) / 2
   const tankHeight = tankDimensions.height * TANK_SCALE
 
-  // Convert equipment size from inches to scene units
-  const eqHeight = equipmentInfo.size.height * TANK_SCALE
+  // Convert equipment size from inches to scene units, accounting for scale
+  const eqWidth = equipmentInfo.size.width * TANK_SCALE * equipmentScale
+  const eqHeight = equipmentInfo.size.height * TANK_SCALE * equipmentScale
+  const eqDepth = equipmentInfo.size.depth * TANK_SCALE * equipmentScale
+
+  // Margin to keep equipment inside the glass
+  const wallMargin = 0.02
 
   switch (equipmentInfo.defaultPosition) {
     case 'back':
-      // Along back wall
+      // Along back wall - position so equipment is against the glass, not through it
       return [
-        (Math.random() - 0.5) * tankHalfLength,
-        eqHeight / 2 + 0.1,
-        -tankHalfWidth + 0.15,
+        (Math.random() - 0.5) * (tankHalfLength - eqWidth) * 0.8,
+        Math.min(eqHeight / 2 + 0.1, tankHeight - eqHeight / 2),
+        -tankHalfWidth + eqDepth / 2 + wallMargin,
       ]
     case 'side': {
       // Along side wall (randomly left or right)
       const side = Math.random() > 0.5 ? 1 : -1
       return [
-        side * (tankHalfLength - 0.15),
-        tankHeight * 0.6,
-        (Math.random() - 0.5) * tankHalfWidth * 0.5,
+        side * (tankHalfLength - eqDepth / 2 - wallMargin),
+        Math.min(tankHeight * 0.6, tankHeight - eqHeight / 2),
+        (Math.random() - 0.5) * (tankHalfWidth - eqWidth) * 0.5,
       ]
     }
     case 'corner': {
       // Back corner
       const cornerSide = Math.random() > 0.5 ? 1 : -1
       return [
-        cornerSide * (tankHalfLength - 0.2),
-        eqHeight / 2 + 0.1,
-        -tankHalfWidth + 0.2,
+        cornerSide * (tankHalfLength - eqWidth / 2 - wallMargin),
+        Math.min(eqHeight / 2 + 0.1, tankHeight - eqHeight / 2),
+        -tankHalfWidth + eqDepth / 2 + wallMargin,
       ]
     }
     case 'sump':
@@ -92,7 +111,8 @@ export const useEquipmentStore = create<EquipmentState>((set) => ({
     if (!info) return state
 
     const tankDimensions = useTankStore.getState().dimensions
-    const position = getEquipmentPosition(info, tankDimensions)
+    const scale = getEquipmentScale(tankDimensions)
+    const position = getEquipmentPosition(info, tankDimensions, scale)
 
     // Rotation based on placement
     let rotation: [number, number, number] = [0, 0, 0]
@@ -107,7 +127,7 @@ export const useEquipmentStore = create<EquipmentState>((set) => ({
       name: info.name,
       position,
       rotation,
-      scale: 1,
+      scale,
       color: info.color,
       visible: info.placement !== 'external', // Hide sump equipment by default
     }

@@ -82,23 +82,9 @@ export function DayNightLighting() {
     // Moon light (blue-ish)
     moonRef.current.intensity = (1 - dayFactor) * 0.3
 
-    // Color temperature shift
-    const dayColor = new THREE.Color(0xffffff)
-    const sunsetColor = new THREE.Color(0xffaa66)
-    const nightColor = new THREE.Color(0x6688cc)
-
-    if (dayFactor > 0.8) {
-      // Day - white light
-      ambientRef.current.color = dayColor
-    } else if (dayFactor > 0.2) {
-      // Transition - warm sunset/sunrise colors
-      const t = (dayFactor - 0.2) / 0.6
-      ambientRef.current.color = sunsetColor.clone().lerp(dayColor, t)
-    } else {
-      // Night - cool blue
-      const t = dayFactor / 0.2
-      ambientRef.current.color = nightColor.clone().lerp(sunsetColor, t)
-    }
+    // Use cool white for all lighting conditions
+    const coolWhite = new THREE.Color(0xf5f5ff)
+    ambientRef.current.color = coolWhite
   })
 
   return (
@@ -106,25 +92,46 @@ export function DayNightLighting() {
       {/* Ambient light - base illumination */}
       <ambientLight ref={ambientRef} intensity={0.5} />
 
-      {/* Sun/main directional light */}
+      {/* Sun/main directional light with improved shadows */}
       <directionalLight
         ref={sunRef}
-        position={[10, 10, 5]}
-        intensity={1}
+        position={[8, 12, 6]}
+        intensity={1.2}
         color={0xffffff}
         castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={50}
+        shadow-camera-left={-10}
+        shadow-camera-right={10}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+        shadow-bias={-0.0001}
+        shadow-normalBias={0.02}
       />
 
-      {/* Moon light - subtle blue fill from opposite side */}
+      {/* Moon light - cool white fill from opposite side */}
       <directionalLight
         ref={moonRef}
         position={[-5, 8, -5]}
         intensity={0}
-        color={0x6688cc}
+        color={0xf5f5ff}
       />
 
-      {/* Secondary fill light */}
-      <directionalLight position={[-5, 5, -5]} intensity={0.3} />
+      {/* Secondary fill light for softer shadows */}
+      <directionalLight position={[-5, 5, -5]} intensity={0.25} color={0xffffff} />
+
+      {/* Underwater caustic simulation light */}
+      <pointLight
+        position={[0, 3, 0]}
+        intensity={0.3}
+        color={0xffffff}
+        distance={8}
+        decay={2}
+      />
+
+      {/* Rim light from behind for depth */}
+      <directionalLight position={[0, 2, -8]} intensity={0.15} color={0xffffff} />
     </>
   )
 }

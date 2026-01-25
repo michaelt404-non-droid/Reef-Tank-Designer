@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useLightStore } from '../../stores/lightStore'
 import { useTankStore } from '../../stores/tankStore'
+import { useSimulationStore } from '../../stores/simulationStore'
 import { calculateTotalPAR, getPARColor } from '../../utils/parCalculator'
 
 const SCALE = 0.1
@@ -11,6 +12,7 @@ export function PAROverlay() {
   const lights = useLightStore((state) => state.lights)
   const showPAROverlay = useLightStore((state) => state.showPAROverlay)
   const dimensions = useTankStore((state) => state.dimensions)
+  const mode = useSimulationStore((state) => state.mode)
 
   // Generate PAR heatmap geometry
   const { geometry } = useMemo(() => {
@@ -62,7 +64,8 @@ export function PAROverlay() {
     return { geometry: geo, colors: colorArray }
   }, [lights, dimensions])
 
-  if (!showPAROverlay || lights.length === 0) return null
+  // Hide PAR overlay in simulation mode or when disabled
+  if (!showPAROverlay || lights.length === 0 || mode === 'simulation') return null
 
   return (
     <mesh geometry={geometry}>

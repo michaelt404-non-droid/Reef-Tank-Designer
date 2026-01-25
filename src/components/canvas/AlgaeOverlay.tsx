@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import { useSimulationStore } from '../../stores/simulationStore'
 import { useTankStore } from '../../stores/tankStore'
@@ -92,6 +92,14 @@ export function AlgaeOverlay() {
     blending: THREE.NormalBlending,
     depthWrite: false,
   }), [algaeColor, opacity, algaeTexture])
+
+  // Dispose texture and material on unmount or when they change
+  useEffect(() => {
+    return () => {
+      algaeTexture?.dispose()
+      algaeMaterial.dispose()
+    }
+  }, [algaeTexture, algaeMaterial])
 
   // Only render in simulation mode with algae present
   if (mode !== 'simulation' || algaeLevel < 0.05) return null

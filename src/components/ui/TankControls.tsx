@@ -1,4 +1,5 @@
 import { useTankStore, TANK_PRESETS } from '../../stores/tankStore'
+import { useHistoryStore } from '../../stores/historyStore'
 
 export function TankControls() {
   const { dimensions, setDimensions, gallons } = useTankStore()
@@ -7,7 +8,12 @@ export function TankControls() {
     const preset = TANK_PRESETS[e.target.value as keyof typeof TANK_PRESETS]
     if (preset) {
       setDimensions(preset)
+      useHistoryStore.getState().pushSnapshot('Change Tank Size')
     }
+  }
+
+  const pushDimensionHistory = () => {
+    useHistoryStore.getState().pushSnapshot('Change Tank Size')
   }
 
   return (
@@ -39,6 +45,8 @@ export function TankControls() {
           max="96"
           value={dimensions.length}
           onChange={(e) => setDimensions({ length: Number(e.target.value) })}
+          onMouseUp={pushDimensionHistory}
+          onTouchEnd={pushDimensionHistory}
           className="w-full accent-cyan-500"
         />
       </div>
@@ -54,6 +62,8 @@ export function TankControls() {
           max="36"
           value={dimensions.width}
           onChange={(e) => setDimensions({ width: Number(e.target.value) })}
+          onMouseUp={pushDimensionHistory}
+          onTouchEnd={pushDimensionHistory}
           className="w-full accent-cyan-500"
         />
       </div>
@@ -69,6 +79,8 @@ export function TankControls() {
           max="36"
           value={dimensions.height}
           onChange={(e) => setDimensions({ height: Number(e.target.value) })}
+          onMouseUp={pushDimensionHistory}
+          onTouchEnd={pushDimensionHistory}
           className="w-full accent-cyan-500"
         />
       </div>

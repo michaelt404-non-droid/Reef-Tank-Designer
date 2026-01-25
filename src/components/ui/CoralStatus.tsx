@@ -1,20 +1,8 @@
 import { useCoralStore } from '../../stores/coralStore'
 import { CORAL_INFO } from '../../data/corals'
 
-// Inline types to avoid Safari import issues
-type CoralType = 'mushrooms' | 'zoanthids' | 'softCorals' | 'lps' | 'sps' | 'acropora'
-
-interface PlacedCoral {
-  id: string
-  coralType: CoralType
-  health: number
-  growthProgress: number
-  colorIntensity: number
-  color: string
-}
-
 export function CoralStatus() {
-  const corals = useCoralStore((state: { corals: PlacedCoral[] }) => state.corals)
+  const corals = useCoralStore((state) => state.corals)
 
   if (corals.length === 0) {
     return (

@@ -1,6 +1,6 @@
 // Fish categories for reef tanks
 const FISH_TYPES = ['clownfish', 'tang', 'wrasse', 'goby', 'blenny', 'angelfish', 'chromis', 'cardinalfish'] as const
-type FishType = typeof FISH_TYPES[number]
+type FishType = string
 
 // Compatibility levels
 type CompatibilityLevel = 'incompatible' | 'caution' | 'compatible'
@@ -11,17 +11,8 @@ interface CompatibilityRule {
   reason: string
 }
 
-// Pattern types for fish coloration
-type PatternType = 'solid' | 'stripes' | 'horizontal_stripes' | 'spots' | 'gradient' | 'two_tone'
-
-interface PatternConfig {
-  type: PatternType
-  colors?: string[]
-  stripeCount?: number
-  stripeWidth?: number
-  spotSize?: number
-  spotDensity?: number
-}
+// Swim zone preferences - where in the water column the fish prefers
+type SwimZone = 'bottom' | 'lower' | 'middle' | 'upper' | 'top' | 'all'
 
 interface FishInfo {
   id: FishType
@@ -30,13 +21,13 @@ interface FishInfo {
   baseSize: number // relative size
   swimSpeed: number // units per second
   schooling: boolean // tends to swim in groups
+  swimZone: SwimZone // preferred depth in tank
   colors: string[]
   minTankSize: number // minimum gallons
   reefSafe: boolean | 'caution' // safe with corals?
   maxPerTank: number // maximum recommended of this species
   compatibility: CompatibilityRule[] // specific compatibility rules
   // Visual customization (optional)
-  pattern?: PatternConfig // Pattern for vertex colors
   modelPath?: string // Optional path to GLTF model
   useModel?: boolean // Flag to prefer model over procedural
 }
@@ -49,6 +40,7 @@ export const FISH_INFO: FishInfo[] = [
     baseSize: 0.08,
     swimSpeed: 0.3,
     schooling: false,
+    swimZone: 'middle', // Clownfish stay mid-tank, near their host anemone
     colors: ['#FF6B00', '#FF8C00', '#FFD700', '#000000'],
     minTankSize: 20,
     reefSafe: true,
@@ -56,16 +48,17 @@ export const FISH_INFO: FishInfo[] = [
     compatibility: [
       { fishType: 'clownfish', level: 'caution', reason: 'May fight if not a mated pair' },
     ],
-    // Classic white vertical stripes
-    pattern: { type: 'stripes', stripeCount: 3, stripeWidth: 0.12 },
+    useModel: true,
+    modelPath: '/models/fish/Clownfish_texture.glb',
   },
   {
     id: 'tang',
-    name: 'Tang',
+    name: 'Blue Tang',
     description: 'Active swimmer, algae eater',
     baseSize: 0.15,
     swimSpeed: 0.5,
     schooling: false,
+    swimZone: 'all', // Tangs are active swimmers, use entire tank
     colors: ['#4169E1', '#FFD700', '#9370DB', '#20B2AA'],
     minTankSize: 75,
     reefSafe: true,
@@ -74,8 +67,8 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'tang', level: 'incompatible', reason: 'Highly territorial with other tangs' },
       { fishType: 'angelfish', level: 'caution', reason: 'May compete for territory' },
     ],
-    // Gradient from head to tail
-    pattern: { type: 'gradient' },
+    useModel: true,
+    modelPath: '/models/fish/Blue_Tang_texture.glb',
   },
   {
     id: 'wrasse',
@@ -84,6 +77,7 @@ export const FISH_INFO: FishInfo[] = [
     baseSize: 0.1,
     swimSpeed: 0.45,
     schooling: false,
+    swimZone: 'lower', // Wrasses hunt near rocks and substrate
     colors: ['#FF69B4', '#00CED1', '#32CD32', '#FF4500'],
     minTankSize: 30,
     reefSafe: true,
@@ -92,8 +86,8 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'wrasse', level: 'caution', reason: 'Males may fight' },
       { fishType: 'goby', level: 'caution', reason: 'May outcompete for food' },
     ],
-    // Horizontal stripes typical of many wrasse
-    pattern: { type: 'horizontal_stripes', stripeCount: 4, stripeWidth: 0.08 },
+    useModel: true,
+    modelPath: '/models/fish/wrasse.glb',
   },
   {
     id: 'goby',
@@ -102,6 +96,7 @@ export const FISH_INFO: FishInfo[] = [
     baseSize: 0.06,
     swimSpeed: 0.2,
     schooling: false,
+    swimZone: 'bottom', // Gobies stay on/near substrate
     colors: ['#F5DEB3', '#FFD700', '#4682B4', '#8B4513'],
     minTankSize: 10,
     reefSafe: true,
@@ -109,8 +104,8 @@ export const FISH_INFO: FishInfo[] = [
     compatibility: [
       { fishType: 'blenny', level: 'caution', reason: 'May compete for hiding spots' },
     ],
-    // Two-tone coloration (darker below)
-    pattern: { type: 'two_tone' },
+    useModel: true,
+    modelPath: '/models/fish/goby.glb',
   },
   {
     id: 'blenny',
@@ -119,6 +114,7 @@ export const FISH_INFO: FishInfo[] = [
     baseSize: 0.07,
     swimSpeed: 0.25,
     schooling: false,
+    swimZone: 'bottom', // Blennies perch on rocks near bottom
     colors: ['#8B4513', '#556B2F', '#708090', '#D2691E'],
     minTankSize: 20,
     reefSafe: true,
@@ -127,8 +123,8 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'blenny', level: 'caution', reason: 'May be territorial with other blennies' },
       { fishType: 'goby', level: 'caution', reason: 'May compete for hiding spots' },
     ],
-    // Spotted/mottled pattern
-    pattern: { type: 'spots', spotSize: 0.08, spotDensity: 0.4 },
+    useModel: true,
+    modelPath: '/models/fish/blenny.glb',
   },
   {
     id: 'angelfish',
@@ -137,6 +133,7 @@ export const FISH_INFO: FishInfo[] = [
     baseSize: 0.12,
     swimSpeed: 0.35,
     schooling: false,
+    swimZone: 'middle', // Angelfish cruise mid-water around rockwork
     colors: ['#FFD700', '#4169E1', '#000000', '#FF6347'],
     minTankSize: 55,
     reefSafe: 'caution', // May nip at corals
@@ -145,38 +142,40 @@ export const FISH_INFO: FishInfo[] = [
       { fishType: 'angelfish', level: 'incompatible', reason: 'Very territorial with other angels' },
       { fishType: 'tang', level: 'caution', reason: 'May compete for territory' },
     ],
-    // Bold vertical stripes
-    pattern: { type: 'stripes', stripeCount: 5, stripeWidth: 0.08 },
+    useModel: true,
+    modelPath: '/models/fish/angelfish.glb',
   },
   {
     id: 'chromis',
-    name: 'Chromis',
+    name: 'Blue-Green Chromis',
     description: 'Peaceful schooling fish',
     baseSize: 0.05,
     swimSpeed: 0.4,
     schooling: true,
-    colors: ['#00BFFF', '#32CD32', '#9370DB', '#FFD700'],
+    swimZone: 'upper', // Chromis school in upper water column
+    colors: ['#00BFFF', '#32CD32', '#40E0D0', '#7FFFD4'],
     minTankSize: 30,
     reefSafe: true,
     maxPerTank: 7, // Best kept in odd-numbered schools
     compatibility: [], // Peaceful with everyone
-    // Solid coloration typical of chromis
-    pattern: { type: 'solid' },
+    useModel: true,
+    modelPath: '/models/fish/Blue_Green_Chromis_texture.glb',
   },
   {
     id: 'cardinalfish',
-    name: 'Cardinalfish',
+    name: 'Banggai Cardinalfish',
     description: 'Slow swimmer, nocturnal',
     baseSize: 0.06,
     swimSpeed: 0.15,
     schooling: true,
+    swimZone: 'middle', // Cardinalfish hover mid-tank near shelter
     colors: ['#FF6347', '#FFD700', '#C0C0C0', '#8B0000'],
     minTankSize: 20,
     reefSafe: true,
     maxPerTank: 5,
     compatibility: [], // Peaceful with everyone
-    // Spotted pattern (Banggai-style)
-    pattern: { type: 'spots', spotSize: 0.1, spotDensity: 0.3 },
+    useModel: true,
+    modelPath: '/models/fish/Banggai_Cardinalfish_texture.glb',
   },
 ]
 
@@ -296,4 +295,5 @@ export function calculateTankGallons(dimensions: { length: number; width: number
 }
 
 export { FISH_TYPES }
-export type { FishType, FishInfo, CompatibilityLevel, CompatibilityRule, CompatibilityIssue, TankCompatibilityReport, PatternType, PatternConfig }
+export type { FishInfo, SwimZone }
+export type { FishType, CompatibilityLevel, CompatibilityRule, CompatibilityIssue, TankCompatibilityReport }

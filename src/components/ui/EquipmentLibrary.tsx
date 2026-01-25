@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useEquipmentStore } from '../../stores/equipmentStore'
+import { useHistoryStore } from '../../stores/historyStore'
 import { EQUIPMENT_TYPES, getEquipmentTypeLabel, getEquipmentByType } from '../../data/equipment'
 
-type EquipmentType = 'pump' | 'heater' | 'skimmer' | 'powerhead' | 'wavemaker' | 'ato'
+type EquipmentType = 'pump' | 'heater' | 'skimmer' | 'wavemaker' | 'ato'
 
 export function EquipmentLibrary() {
   const [expanded, setExpanded] = useState(false)
@@ -17,6 +18,7 @@ export function EquipmentLibrary() {
 
   const handleAddEquipment = (equipmentInfoId: string) => {
     addEquipment(equipmentInfoId)
+    useHistoryStore.getState().pushSnapshot('Add Equipment')
   }
 
   return (
@@ -93,12 +95,12 @@ export function EquipmentLibrary() {
                 <div className="text-gray-300">Heater</div>
               </button>
               <button
-                onClick={() => handleAddEquipment('powerhead-medium')}
+                onClick={() => handleAddEquipment('wavemaker-medium')}
                 className="p-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-center transition-colors"
-                title="Add powerhead"
+                title="Add wavemaker"
               >
                 <div className="text-lg mb-1">🌊</div>
-                <div className="text-gray-300">Powerhead</div>
+                <div className="text-gray-300">Wavemaker</div>
               </button>
               <button
                 onClick={() => handleAddEquipment('skimmer-nano')}
@@ -118,7 +120,10 @@ export function EquipmentLibrary() {
                 {equipment.length} piece{equipment.length !== 1 ? 's' : ''} placed
               </span>
               <button
-                onClick={clearAllEquipment}
+                onClick={() => {
+                  clearAllEquipment()
+                  useHistoryStore.getState().pushSnapshot('Clear All Equipment')
+                }}
                 className="text-xs text-red-400 hover:text-red-300"
               >
                 Clear all

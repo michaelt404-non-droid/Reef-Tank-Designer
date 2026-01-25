@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import { FISH_INFO } from '../data/fish'
 
 // Inline type to avoid Safari import issues
 type FishType = 'clownfish' | 'tang' | 'wrasse' | 'goby' | 'blenny' | 'angelfish' | 'chromis' | 'cardinalfish'
@@ -487,11 +486,7 @@ export interface PatternConfig {
 }
 
 export function getPatternForFish(fishType: FishType): PatternConfig {
-  const fishInfo = FISH_INFO.find(f => f.id === fishType)
-  if (fishInfo?.pattern) {
-    return fishInfo.pattern as PatternConfig
-  }
-  // Default patterns by species
+  // Default patterns by species (FishInfo doesn't have pattern property)
   switch (fishType) {
     case 'clownfish':
       return { type: 'stripes', stripeCount: 3, stripeWidth: 0.12 }

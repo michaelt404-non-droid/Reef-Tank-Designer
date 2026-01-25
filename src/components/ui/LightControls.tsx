@@ -1,5 +1,6 @@
 import { useLightStore } from '../../stores/lightStore'
 import { useTankStore } from '../../stores/tankStore'
+import { useHistoryStore } from '../../stores/historyStore'
 
 export function LightControls() {
   const lights = useLightStore((state) => state.lights)
@@ -33,7 +34,10 @@ export function LightControls() {
           <div className="text-xs text-gray-400">{selectedLight.fixture.brand}</div>
         </div>
         <button
-          onClick={() => removeLight(selectedLight.id)}
+          onClick={() => {
+            removeLight(selectedLight.id)
+            useHistoryStore.getState().pushSnapshot('Delete Light')
+          }}
           className="px-2 py-1 text-xs bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded"
         >
           Delete

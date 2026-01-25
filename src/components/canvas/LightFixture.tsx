@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useLightStore } from '../../stores/lightStore'
@@ -20,6 +20,8 @@ interface LightFixtureProps {
 export function LightFixtureMesh({ light }: LightFixtureProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const spotlightRef = useRef<THREE.SpotLight>(null)
+  const housingMaterialRef = useRef<THREE.MeshLambertMaterial | null>(null)
+  const ledMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null)
 
   const selectedLightId = useLightStore((state) => state.selectedLightId)
   const selectLight = useLightStore((state) => state.selectLight)
@@ -33,19 +35,51 @@ export function LightFixtureMesh({ light }: LightFixtureProps) {
     return { x: Math.max(length, 0.3), y: 0.1, z: Math.max(width, 0.3) }
   }, [light.fixture.coverage])
 
-  // Material for housing
-  const housingMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-    color: isSelected ? '#0ea5e9' : '#333333',
-    metalness: 0.8,
-    roughness: 0.2,
-  }), [isSelected])
+  // Material for housing - update color instead of recreating
+  const housingMaterial = useMemo(() => {
+    if (!housingMaterialRef.current) {
+      housingMaterialRef.current = new THREE.MeshLambertMaterial({
+        color: '#333333',
+        flatShading: true,
+      })
+    }
+    return housingMaterialRef.current
+  }, [])
 
-  // Glow material for LED panel
-  const ledMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: light.enabled ? '#4da6ff' : '#222222',
-    transparent: true,
-    opacity: light.enabled ? 0.8 + (light.intensity / 100) * 0.2 : 0.3,
-  }), [light.enabled, light.intensity])
+  // Update housing color when selection changes
+  useEffect(() => {
+    if (housingMaterialRef.current) {
+      housingMaterialRef.current.color.set(isSelected ? '#0ea5e9' : '#333333')
+    }
+  }, [isSelected])
+
+  // Glow material for LED panel - update properties instead of recreating
+  const ledMaterial = useMemo(() => {
+    if (!ledMaterialRef.current) {
+      ledMaterialRef.current = new THREE.MeshBasicMaterial({
+        color: '#222222',
+        transparent: true,
+        opacity: 0.3,
+      })
+    }
+    return ledMaterialRef.current
+  }, [])
+
+  // Update LED material when enabled/intensity changes
+  useEffect(() => {
+    if (ledMaterialRef.current) {
+      ledMaterialRef.current.color.set(light.enabled ? '#f5f5ff' : '#222222')
+      ledMaterialRef.current.opacity = light.enabled ? 0.8 + (light.intensity / 100) * 0.2 : 0.3
+    }
+  }, [light.enabled, light.intensity])
+
+  // Dispose materials on unmount
+  useEffect(() => {
+    return () => {
+      housingMaterialRef.current?.dispose()
+      ledMaterialRef.current?.dispose()
+    }
+  }, [])
 
   // Animate spotlight intensity
   useFrame(() => {
@@ -85,7 +119,7 @@ export function LightFixtureMesh({ light }: LightFixtureProps) {
           angle={Math.PI / 4}
           penumbra={0.5}
           intensity={(light.intensity / 100) * 2}
-          color="#4da6ff"
+          color="#f5f5ff"
           castShadow={false}
           target-position={[light.position[0], 0, light.position[2]]}
         />

@@ -1,21 +1,8 @@
 import { useFishStore } from '../../stores/fishStore'
 import { FISH_INFO } from '../../data/fish'
 
-// Inline types to avoid Safari import issues
-type FishType = 'clownfish' | 'tang' | 'wrasse' | 'goby' | 'blenny' | 'angelfish' | 'chromis' | 'cardinalfish'
-
-interface PlacedFish {
-  id: string
-  fishType: FishType
-  hunger: number
-  health: number
-  age: number
-  stressLevel: number
-  color: string
-}
-
 export function FishStatus() {
-  const fish = useFishStore((state: { fish: PlacedFish[] }) => state.fish)
+  const fish = useFishStore((state) => state.fish)
 
   if (fish.length === 0) {
     return (

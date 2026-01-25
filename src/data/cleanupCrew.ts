@@ -1,5 +1,5 @@
 // Cleanup crew types for reef tanks
-const CLEANUP_CREW_TYPES = ['snail', 'hermitCrab', 'emeraldCrab', 'cleaner_shrimp', 'sea_cucumber'] as const
+const CLEANUP_CREW_TYPES = ['snail', 'hermitCrab', 'emeraldCrab', 'cleaner_shrimp', 'sea_urchin'] as const
 type CleanupCrewType = typeof CLEANUP_CREW_TYPES[number]
 
 interface CleanupCrewInfo {
@@ -11,6 +11,7 @@ interface CleanupCrewInfo {
   nocturnal: boolean      // more active at night
   maxPerTank: number
   color: string
+  modelPath?: string      // Optional GLB model path
 }
 
 export const CLEANUP_CREW_INFO: CleanupCrewInfo[] = [
@@ -23,6 +24,7 @@ export const CLEANUP_CREW_INFO: CleanupCrewInfo[] = [
     nocturnal: false,
     maxPerTank: 10,
     color: '#8B7355',
+    modelPath: '/models/cleanup/turbo_snail.glb',
   },
   {
     id: 'hermitCrab',
@@ -33,6 +35,7 @@ export const CLEANUP_CREW_INFO: CleanupCrewInfo[] = [
     nocturnal: true,
     maxPerTank: 15,
     color: '#CD853F',
+    modelPath: '/models/cleanup/hermit_crab.glb',
   },
   {
     id: 'emeraldCrab',
@@ -43,6 +46,7 @@ export const CLEANUP_CREW_INFO: CleanupCrewInfo[] = [
     nocturnal: true,
     maxPerTank: 3,
     color: '#2E8B57',
+    modelPath: '/models/cleanup/hermit_crab.glb',  // Reuse hermit crab model
   },
   {
     id: 'cleaner_shrimp',
@@ -55,14 +59,15 @@ export const CLEANUP_CREW_INFO: CleanupCrewInfo[] = [
     color: '#FF6347',
   },
   {
-    id: 'sea_cucumber',
-    name: 'Sea Cucumber',
-    description: 'Filters sand bed',
-    algaeReduction: 0.004,
+    id: 'sea_urchin',
+    name: 'Pincushion Urchin',
+    description: 'Grazes algae off rocks',
+    algaeReduction: 0.006,
     reefSafe: true,
     nocturnal: true,
-    maxPerTank: 2,
-    color: '#4A4A4A',
+    maxPerTank: 3,
+    color: '#8B4513',
+    modelPath: '/models/cleanup/sea_urchin.glb',
   },
 ]
 

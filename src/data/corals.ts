@@ -1,3 +1,7 @@
+// To add your own 3D models for corals:
+// 1. Place your .glb files in the 'public/models/corals/' directory.
+// 2. Update the 'modelPath' for the corresponding coral in the CORAL_INFO array below.
+
 // Coral PAR requirements (duplicated from parCalculator to avoid Safari import issues)
 export const CORAL_PAR_REQUIREMENTS = {
   mushrooms: { min: 30, optimal: 75, max: 150 },
@@ -17,6 +21,7 @@ interface CoralInfo {
   description: string
   baseScale: number
   baseColors: string[]
+  modelPath: string
 }
 
 export const CORAL_INFO: CoralInfo[] = [
@@ -26,6 +31,7 @@ export const CORAL_INFO: CoralInfo[] = [
     description: 'Low light, easy care',
     baseScale: 0.15,
     baseColors: ['#8B4513', '#9932CC', '#228B22', '#DC143C', '#4169E1'],
+    modelPath: '/models/corals/mushrooms.glb',
   },
   {
     id: 'zoanthids',
@@ -33,6 +39,7 @@ export const CORAL_INFO: CoralInfo[] = [
     description: 'Colorful polyp colonies',
     baseScale: 0.12,
     baseColors: ['#FF6347', '#00CED1', '#FFD700', '#FF1493', '#7FFF00'],
+    modelPath: '/models/corals/zoanthids.glb',
   },
   {
     id: 'softCorals',
@@ -40,6 +47,7 @@ export const CORAL_INFO: CoralInfo[] = [
     description: 'Flowing, flexible',
     baseScale: 0.2,
     baseColors: ['#DA70D6', '#20B2AA', '#F0E68C', '#DDA0DD', '#98FB98'],
+    modelPath: '/models/corals/softCorals.glb',
   },
   {
     id: 'lps',
@@ -47,6 +55,7 @@ export const CORAL_INFO: CoralInfo[] = [
     description: 'Large polyp stony',
     baseScale: 0.18,
     baseColors: ['#FF7F50', '#40E0D0', '#ADFF2F', '#FF69B4', '#87CEEB'],
+    modelPath: '/models/corals/lps.glb',
   },
   {
     id: 'sps',
@@ -54,6 +63,7 @@ export const CORAL_INFO: CoralInfo[] = [
     description: 'Small polyp stony',
     baseScale: 0.18,
     baseColors: ['#FF4500', '#00FA9A', '#FFE4B5', '#E6E6FA', '#F5DEB3'],
+    modelPath: '/models/corals/sps.glb',
   },
   {
     id: 'acropora',
@@ -61,5 +71,6 @@ export const CORAL_INFO: CoralInfo[] = [
     description: 'Very high light SPS',
     baseScale: 0.2,
     baseColors: ['#FF69B4', '#00BFFF', '#FFDAB9', '#E0FFFF', '#DDA0DD'],
+    modelPath: '/models/corals/acropora.glb',
   },
 ]

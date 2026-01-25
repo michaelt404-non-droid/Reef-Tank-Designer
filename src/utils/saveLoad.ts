@@ -5,9 +5,11 @@ import { useFishStore } from '../stores/fishStore'
 import { useEquipmentStore } from '../stores/equipmentStore'
 import { useLightStore } from '../stores/lightStore'
 import { useSimulationStore } from '../stores/simulationStore'
+import { useHistoryStore } from '../stores/historyStore'
 
 // Version for save file compatibility (bumped for simulation support)
 const SAVE_VERSION = 2
+const AUTOSAVE_KEY = 'reef-tank-autosave'
 
 interface SaveData {
   version: number
@@ -67,7 +69,7 @@ interface SaveData {
   equipment: Array<{
     id: string
     equipmentInfoId: string
-    type: 'pump' | 'heater' | 'skimmer' | 'powerhead' | 'wavemaker' | 'ato'
+    type: 'pump' | 'heater' | 'skimmer' | 'wavemaker' | 'ato'
     name: string
     position: [number, number, number]
     rotation: [number, number, number]
@@ -259,8 +261,19 @@ export function restoreSaveData(data: SaveData): boolean {
     equipmentStore.clearAllEquipment()
     if (data.equipment) {
       for (const eq of data.equipment) {
+        // Migrate old 'powerhead' type to 'wavemaker'
+        const migratedType = (eq.type as string) === 'powerhead' ? 'wavemaker' : eq.type
+        // Migrate old powerhead equipment IDs to wavemaker IDs
+        let migratedInfoId = eq.equipmentInfoId
+        if (migratedInfoId === 'powerhead-small') migratedInfoId = 'wavemaker-small'
+        if (migratedInfoId === 'powerhead-medium') migratedInfoId = 'wavemaker-medium'
+
         useEquipmentStore.setState(state => ({
-          equipment: [...state.equipment, eq]
+          equipment: [...state.equipment, {
+            ...eq,
+            type: migratedType as 'pump' | 'heater' | 'skimmer' | 'wavemaker' | 'ato',
+            equipmentInfoId: migratedInfoId,
+          }]
         }))
       }
     }
@@ -280,6 +293,10 @@ export function restoreSaveData(data: SaveData): boolean {
         mode: 'design', // Start in design mode
       })
     }
+
+    // Clear undo/redo history and push new initial state
+    useHistoryStore.getState().clear()
+    useHistoryStore.getState().pushSnapshot('Load Design')
 
     return true
   } catch (error) {
@@ -372,4 +389,46 @@ export function importFromFile(file: File): Promise<boolean> {
     reader.onerror = () => resolve(false)
     reader.readAsText(file)
   })
+}
+
+// Auto-save for simulation continuity
+export function autoSave(): boolean {
+  try {
+    const data = gatherSaveData('autosave')
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data))
+    return true
+  } catch (error) {
+    console.error('Auto-save failed:', error)
+    return false
+  }
+}
+
+// Auto-restore from autosave
+export function autoRestore(): boolean {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY)
+    if (!raw) return false
+    const data = JSON.parse(raw) as SaveData
+    const success = restoreSaveData(data)
+    if (!success) {
+      // Clear corrupted autosave
+      localStorage.removeItem(AUTOSAVE_KEY)
+    }
+    return success
+  } catch (error) {
+    console.error('Auto-restore failed:', error)
+    // Clear corrupted autosave
+    localStorage.removeItem(AUTOSAVE_KEY)
+    return false
+  }
+}
+
+// Check if autosave exists
+export function hasAutoSave(): boolean {
+  return localStorage.getItem(AUTOSAVE_KEY) !== null
+}
+
+// Clear autosave
+export function clearAutoSave(): void {
+  localStorage.removeItem(AUTOSAVE_KEY)
 }

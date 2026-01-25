@@ -1,5 +1,4 @@
 import { useSimulationStore } from '../../stores/simulationStore'
-import { TimeDisplay } from './TimeDisplay'
 import { DifficultySelector } from './DifficultySelector'
 import { WaterQualityDisplay } from './WaterQualityDisplay'
 import { FeedingControls } from './FeedingControls'
@@ -9,7 +8,6 @@ import { CleanupCrewControls } from './CleanupCrewControls'
 
 export function SimulationPanel() {
   const isRunning = useSimulationStore((state) => state.isRunning)
-  const toggleSimulation = useSimulationStore((state) => state.toggleSimulation)
   const resetSimulation = useSimulationStore((state) => state.resetSimulation)
   const mode = useSimulationStore((state) => state.mode)
   const setMode = useSimulationStore((state) => state.setMode)
@@ -34,27 +32,14 @@ export function SimulationPanel() {
         </button>
       </div>
 
-      {/* Time display */}
-      <TimeDisplay />
-
-      {/* Control buttons */}
-      <div className="flex gap-2">
-        <button
-          onClick={toggleSimulation}
-          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-            isRunning
-              ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-              : 'bg-green-600 hover:bg-green-700 text-white'
-          }`}
-        >
-          {isRunning ? '\u23F8 Pause' : '\u25B6 Start'}
-        </button>
+      {/* Reset button and difficulty */}
+      <div className="flex gap-2 items-center">
         <button
           onClick={resetSimulation}
           disabled={isRunning}
           className="py-2 px-4 rounded-lg font-medium bg-gray-600 hover:bg-gray-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Reset
+          Reset Simulation
         </button>
       </div>
 

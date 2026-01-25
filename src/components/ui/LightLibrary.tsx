@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLightStore } from '../../stores/lightStore'
+import { useHistoryStore } from '../../stores/historyStore'
 import { LIGHT_FIXTURES, LIGHT_BRANDS } from '../../data/lights'
 
 export function LightLibrary() {
@@ -62,7 +63,10 @@ export function LightLibrary() {
         {filteredLights.map(fixture => (
           <button
             key={fixture.id}
-            onClick={() => addLight(fixture)}
+            onClick={() => {
+              addLight(fixture)
+              useHistoryStore.getState().pushSnapshot('Add Light')
+            }}
             className="w-full p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-left transition-colors"
           >
             <div className="flex justify-between items-start">
@@ -81,7 +85,10 @@ export function LightLibrary() {
 
       {lights.length > 0 && (
         <button
-          onClick={clearAllLights}
+          onClick={() => {
+            clearAllLights()
+            useHistoryStore.getState().pushSnapshot('Clear All Lights')
+          }}
           className="w-full py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded text-sm transition-colors"
         >
           Clear All Lights

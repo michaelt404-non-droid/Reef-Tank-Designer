@@ -154,12 +154,12 @@ type PARStatus = 'optimal' | 'acceptable' | 'incompatible'
 
 // Get PAR compatibility status for a coral at a position
 export function getCoralPARStatus(
-  coralType: CoralPARType,
+  coralType: CoralPARType | string,
   position: { x: number; y: number; z: number },
   lights: PlacedLight[]
 ): { status: PARStatus; par: number } {
   const par = calculateTotalPAR(lights, position)
-  const req = CORAL_PAR_REQUIREMENTS[coralType]
+  const req = CORAL_PAR_REQUIREMENTS[coralType as CoralPARType] ?? { min: 50, optimal: 150, max: 300 }
 
   if (par >= req.min && par <= req.max) {
     // Within acceptable range, check if optimal

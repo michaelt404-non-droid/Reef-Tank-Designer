@@ -3,7 +3,25 @@ import { useTankStore } from './tankStore'
 import { FISH_INFO } from '../data/fish'
 
 // Inline type to avoid Safari import issues
-type FishType = 'clownfish' | 'tang' | 'wrasse' | 'goby' | 'blenny' | 'angelfish' | 'chromis' | 'cardinalfish'
+type FishType = string
+
+// Inline FishInfo interface to avoid Safari import issues
+interface FishInfo {
+  id: FishType
+  name: string
+  description: string
+  baseSize: number
+  swimSpeed: number
+  schooling: boolean
+  swimZone?: 'bottom' | 'lower' | 'middle' | 'upper' | 'top' | 'all'
+  colors: string[]
+  minTankSize: number
+  reefSafe: boolean | 'caution'
+  maxPerTank: number
+  compatibility: Array<{ fishType: FishType; level: string; reason: string }>
+  modelPath?: string
+  useModel?: boolean
+}
 
 interface PlacedFish {
   id: string
@@ -26,8 +44,10 @@ interface PlacedFish {
 
 interface FishState {
   fish: PlacedFish[]
+  customFishModels: FishInfo[]
   selectedFishId: string | null
   addFish: (fishType: FishType) => void
+  addCustomFishModel: (name: string, modelPath: string) => void
   removeFish: (id: string) => void
   updateFish: (id: string, updates: Partial<PlacedFish>) => void
   selectFish: (id: string | null) => void
@@ -40,32 +60,63 @@ interface FishState {
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
 
-// Generate a random position within tank bounds
-function getRandomPosition(tankDimensions: { length: number; width: number; height: number }): [number, number, number] {
+// Get Y bounds for a swim zone
+function getZoneBounds(zone: string, tankHeight: number): { minY: number; maxY: number } {
+  const sandHeight = 0.15
+  const surfaceMargin = 0.15
+  const usableMin = sandHeight
+  const usableMax = tankHeight - surfaceMargin
+
+  switch (zone) {
+    case 'bottom':
+      return { minY: usableMin, maxY: usableMin + (usableMax - usableMin) * 0.25 }
+    case 'lower':
+      return { minY: usableMin + (usableMax - usableMin) * 0.1, maxY: usableMin + (usableMax - usableMin) * 0.45 }
+    case 'middle':
+      return { minY: usableMin + (usableMax - usableMin) * 0.3, maxY: usableMin + (usableMax - usableMin) * 0.7 }
+    case 'upper':
+      return { minY: usableMin + (usableMax - usableMin) * 0.55, maxY: usableMin + (usableMax - usableMin) * 0.9 }
+    case 'top':
+      return { minY: usableMin + (usableMax - usableMin) * 0.75, maxY: usableMax }
+    case 'all':
+    default:
+      return { minY: usableMin, maxY: usableMax }
+  }
+}
+
+// Generate a random position within tank bounds and swim zone
+function getRandomPosition(
+  tankDimensions: { length: number; width: number; height: number },
+  swimZone: string = 'all'
+): [number, number, number] {
   const SCALE = 0.1
   const margin = 0.3
   const tankHalfLength = (tankDimensions.length * SCALE) / 2 - margin
   const tankHalfWidth = (tankDimensions.width * SCALE) / 2 - margin
   const tankHeight = tankDimensions.height * SCALE
 
+  const zoneBounds = getZoneBounds(swimZone, tankHeight)
+
   return [
     (Math.random() - 0.5) * tankHalfLength * 2,
-    0.3 + Math.random() * (tankHeight - 0.6), // Stay in water column
+    zoneBounds.minY + Math.random() * (zoneBounds.maxY - zoneBounds.minY),
     (Math.random() - 0.5) * tankHalfWidth * 2,
   ]
 }
 
 export const useFishStore = create<FishState>((set) => ({
   fish: [],
+  customFishModels: [],
   selectedFishId: null,
 
   addFish: (fishType) => set((state) => {
-    const fishInfo = FISH_INFO.find(f => f.id === fishType)
+    const fishInfo = [...FISH_INFO, ...state.customFishModels].find(f => f.id === fishType)
     if (!fishInfo) return state
 
     const tankDimensions = useTankStore.getState().dimensions
-    const position = getRandomPosition(tankDimensions)
-    const targetPosition = getRandomPosition(tankDimensions)
+    const swimZone = fishInfo.swimZone || 'all'
+    const position = getRandomPosition(tankDimensions, swimZone)
+    const targetPosition = getRandomPosition(tankDimensions, swimZone)
 
     // Random scale variation
     const scale = fishInfo.baseSize * (0.8 + Math.random() * 0.4)
@@ -93,6 +144,25 @@ export const useFishStore = create<FishState>((set) => ({
     }
 
     return { fish: [...state.fish, newFish] }
+  }),
+
+  addCustomFishModel: (name, modelPath) => set((state) => {
+    const newModel: FishInfo = {
+      id: `model-${generateId()}`,
+      name,
+      description: 'Custom 3D model',
+      baseSize: 0.1,
+      swimSpeed: 0.3,
+      schooling: false,
+      colors: ['#ffffff', '#ff0000', '#00ff00', '#0000ff'], // Default colors
+      minTankSize: 10,
+      reefSafe: true,
+      maxPerTank: 5,
+      compatibility: [],
+      useModel: true,
+      modelPath,
+    };
+    return { customFishModels: [...state.customFishModels, newModel] };
   }),
 
   removeFish: (id) => set((state) => ({

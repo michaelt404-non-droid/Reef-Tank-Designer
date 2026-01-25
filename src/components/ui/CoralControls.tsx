@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useCoralStore } from '../../stores/coralStore'
 import { useLightStore } from '../../stores/lightStore'
 import { useTankStore } from '../../stores/tankStore'
+import { useHistoryStore } from '../../stores/historyStore'
 import { CORAL_INFO, CORAL_PAR_REQUIREMENTS } from '../../data/corals'
 import { getCoralPARStatus } from '../../utils/parCalculator'
 
@@ -29,8 +30,9 @@ export function CoralControls() {
     return null
   }
 
+  type CoralType = 'mushrooms' | 'zoanthids' | 'softCorals' | 'lps' | 'sps' | 'acropora'
   const coralInfo = CORAL_INFO.find(c => c.id === selectedCoral.coralType)
-  const parReq = CORAL_PAR_REQUIREMENTS[selectedCoral.coralType]
+  const parReq = CORAL_PAR_REQUIREMENTS[selectedCoral.coralType as CoralType] ?? { min: 50, optimal: 150, max: 300 }
 
   // Convert tank dimensions to 3D units
   const SCALE = 0.1
@@ -61,7 +63,10 @@ export function CoralControls() {
           <div className="text-xs text-gray-400">{coralInfo?.description}</div>
         </div>
         <button
-          onClick={() => removeCoral(selectedCoral.id)}
+          onClick={() => {
+            removeCoral(selectedCoral.id)
+            useHistoryStore.getState().pushSnapshot('Delete Coral')
+          }}
           className="px-2 py-1 text-xs bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded"
         >
           Delete

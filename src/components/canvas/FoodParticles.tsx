@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useSimulationStore } from '../../stores/simulationStore'
@@ -60,11 +60,18 @@ function FoodParticleMesh({ particle }: FoodParticleMeshProps) {
     }
   }, [particle.type, size])
 
-  const material = useMemo(() => new THREE.MeshStandardMaterial({
+  const material = useMemo(() => new THREE.MeshLambertMaterial({
     color,
-    roughness: 0.8,
-    metalness: 0,
+    flatShading: true,
   }), [color])
+
+  // Dispose geometry and material on unmount
+  useEffect(() => {
+    return () => {
+      geometry.dispose()
+      material.dispose()
+    }
+  }, [geometry, material])
 
   // Check for nearby hungry fish
   useFrame(() => {

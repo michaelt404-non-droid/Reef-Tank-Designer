@@ -1,7 +1,7 @@
 import { useSimulationStore } from '../../stores/simulationStore'
 import { CLEANUP_CREW_INFO } from '../../data/cleanupCrew'
 
-type CleanupCrewType = 'snail' | 'hermitCrab' | 'emeraldCrab' | 'cleaner_shrimp' | 'sea_cucumber'
+type CleanupCrewType = 'snail' | 'hermitCrab' | 'emeraldCrab' | 'cleaner_shrimp' | 'sea_urchin'
 
 interface CleanupCrewMember {
   id: string

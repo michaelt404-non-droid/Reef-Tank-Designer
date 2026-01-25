@@ -14,18 +14,18 @@ export interface RockInfo {
   modelPath?: string
 }
 
-// Built-in procedural rocks
-export const PROCEDURAL_ROCKS: RockInfo[] = [
-  { id: 'boulder', name: 'Boulder', description: 'Large rounded rock', baseScale: 0.4, type: 'procedural', proceduralType: 'boulder' },
-  { id: 'branch', name: 'Branch Rock', description: 'Branching structure', baseScale: 0.35, type: 'procedural', proceduralType: 'branch' },
-  { id: 'shelf', name: 'Shelf Rock', description: 'Flat platform rock', baseScale: 0.5, type: 'procedural', proceduralType: 'shelf' },
-  { id: 'pillar', name: 'Pillar', description: 'Tall vertical rock', baseScale: 0.3, type: 'procedural', proceduralType: 'pillar' },
-  { id: 'rubble', name: 'Rubble', description: 'Small rock pieces', baseScale: 0.2, type: 'procedural', proceduralType: 'rubble' },
-  { id: 'cave', name: 'Cave', description: 'Hollow hiding spot', baseScale: 0.4, type: 'procedural', proceduralType: 'cave' },
-  { id: 'arch', name: 'Arch', description: 'Swim-through arch', baseScale: 0.45, type: 'procedural', proceduralType: 'arch' },
+// Built-in 3D model rocks
+export const BUILTIN_ROCKS: RockInfo[] = [
+  { id: 'chunky-reef', name: 'Chunky Reef', description: 'Textured reef rock', baseScale: 0.3, type: 'model', modelPath: '/models/rocks/chunky_reef_texture.glb' },
+  { id: 'flat-plate', name: 'Flat Plate', description: 'Plating reef rock', baseScale: 0.3, type: 'model', modelPath: '/models/rocks/flat_plating_reef_texture.glb' },
+  { id: 'rubble', name: 'Rubble', description: 'Small rock pieces', baseScale: 0.3, type: 'model', modelPath: '/models/rocks/rubble_texture.glb' },
+  { id: 'pillar', name: 'Pillar', description: 'Tall vertical rock', baseScale: 0.3, type: 'model', modelPath: '/models/rocks/pillar_texture.glb' },
+  { id: 'cave', name: 'Cave', description: 'Hollow hiding spot', baseScale: 0.3, type: 'model', modelPath: '/models/rocks/cave_texture.glb' },
+  { id: 'arch', name: 'Arch', description: 'Swim-through arch', baseScale: 0.3, type: 'model', modelPath: '/models/rocks/arch_texture.glb' },
 ]
 
-// This will be populated with custom model rocks
+// Legacy - keeping for backwards compatibility
+export const PROCEDURAL_ROCKS: RockInfo[] = []
 export const MODEL_ROCKS: RockInfo[] = []
 
 export interface PlacedRock {
@@ -81,12 +81,19 @@ export const useRockStore = create<RockState>((set) => ({
 
     // Generate initial position within tank bounds
     const rockBounds = getRockBounds(rockInfo.type, rockInfo.proceduralType, clampedScale)
+    const isModelRock = rockInfo.type === 'model'
+    const sandBedHeight = 0.12
+
+    // For model rocks (GLB), origin is at bottom, so Y position IS the bottom
+    // For procedural rocks, origin is at center, so we need to add halfY
+    const initialY = isModelRock ? sandBedHeight : sandBedHeight + rockBounds.halfY
+
     const initialPosition: [number, number, number] = [
       (Math.random() - 0.5) * (tankBounds.halfX * 2 - rockBounds.halfX * 2 - 0.2),
-      rockBounds.halfY + 0.05, // Sit just above sand bed
+      initialY,
       (Math.random() - 0.5) * (tankBounds.halfZ * 2 - rockBounds.halfZ * 2 - 0.2),
     ]
-    const clampedPosition = clampRockPosition(initialPosition, rockBounds, tankBounds)
+    const clampedPosition = clampRockPosition(initialPosition, rockBounds, tankBounds, isModelRock)
 
     const newRock: PlacedRock = {
       id: generateId(),

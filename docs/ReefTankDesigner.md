@@ -1,7 +1,7 @@
 # Reef Tank Designer - Project Notes
 
-> **Status**: Phase 3 Complete - Ready for Phase 4 (Coral System)
-> **Last Updated**: January 20, 2026
+> **Status**: Graphics & Performance Optimization Session Complete
+> **Last Updated**: January 23, 2026
 
 ---
 
@@ -266,10 +266,13 @@ When resuming development:
 
 2. **Open in browser:** http://localhost:5173
 
-3. **Next task:** Phase 4 - Coral System
-   - Create coral database with PAR requirements
-   - Add coral placement on rocks
-   - Implement PAR compatibility checking
+3. **Next session options:**
+   - **Graphics optimization**: Find middle ground between quality and performance
+     - Could add bloom to specific objects only (corals)
+     - Could make graphics quality a user setting (Low/Medium/High)
+     - Could add subtle transmission to front glass panel only
+   - **Test current state**: Check if rock movement is smooth now after removing heavy effects
+   - **Continue with simulation features**: All 7 phases documented as complete in CLAUDE.md
 
 ### Known Issue: Safari TypeScript Imports
 
@@ -283,6 +286,38 @@ If you see "Importing binding name 'X' is not found" errors, inline the type in 
 ---
 
 ## Changelog
+
+### January 23, 2026 - Bug Fixes, Memory Leaks, Graphics
+**Fixed critical bugs from Gemini's changes:**
+- Fixed black screen on startup - `CleanupCrew` was used in Scene.tsx but never imported
+- Fixed rocks falling through tank bottom - minY now accounts for sand bed height + rock halfY
+
+**Memory leak fixes added to all mesh components:**
+- Added useEffect cleanup with geometry.dispose() and material.dispose() to:
+  - FoodParticles.tsx, LightFixture.tsx, CleanupCrewMemberMesh.tsx
+  - EquipmentMesh.tsx, CoralMesh.tsx, RockMesh.tsx, FishMesh.tsx, AlgaeOverlay.tsx
+
+**Graphics enhancements (kept):**
+- Tank.tsx: Water surface shader with animated ripples, caustics shader on sand
+- Glass material with clearcoat reflections
+- Contact shadows and Environment reflections in Scene
+- Enhanced cleanup crew models (detailed snail, shrimp, hermit crab, sea cucumber)
+
+**Graphics removed (performance issues):**
+- Post-processing (Bloom, Vignette, ChromaticAberration) - caused scene crashes with 3+ corals
+- Fog - caused stability issues
+- Transmission on glass - too expensive (requires double render per object)
+- Metal rim around tank top - user feedback (looked like a lid)
+
+**Rock movement improvements:**
+- Changed drag to horizontal plane (more intuitive left/right/forward/back)
+- Added shift+drag for vertical movement (up/down)
+- Fixed bounds clamping in rockBounds.ts
+
+**Current state:**
+- Water still ripples, caustics animate on sand, glass looks good
+- Performance should be smooth now after removing heavy effects
+- Graphics vs performance tradeoff discussion ongoing
 
 ### January 20, 2026
 - Phase 3 complete: Lighting & PAR system

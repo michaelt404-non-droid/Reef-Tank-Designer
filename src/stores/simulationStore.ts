@@ -3,7 +3,7 @@ import { create } from 'zustand'
 // Inline types to avoid Safari import issues
 type Difficulty = 'beginner' | 'intermediate' | 'expert'
 type TimeOfDay = 'day' | 'night'
-type CleanupCrewType = 'snail' | 'hermitCrab' | 'emeraldCrab' | 'cleaner_shrimp' | 'sea_cucumber'
+type CleanupCrewType = 'snail' | 'hermitCrab' | 'emeraldCrab' | 'cleaner_shrimp' | 'sea_urchin'
 
 interface CleanupCrewMember {
   id: string
@@ -320,7 +320,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         hermitCrab: { base: 0.003, nocturnal: true },
         emeraldCrab: { base: 0.008, nocturnal: true },
         cleaner_shrimp: { base: 0.002, nocturnal: false },
-        sea_cucumber: { base: 0.004, nocturnal: true },
+        sea_urchin: { base: 0.006, nocturnal: true },
       }
       const rate = rates[member.type]
       if (rate) {
