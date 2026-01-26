@@ -21,7 +21,7 @@ import { useEquipmentStore } from '../../stores/equipmentStore'
 import { useLightStore } from '../../stores/lightStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTankStore } from '../../stores/tankStore'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { ACESFilmicToneMapping } from 'three'
 
 // Convert inches to 3D units (1 inch = 0.1 units for nice scale)
@@ -51,31 +51,19 @@ function SceneContent() {
     setPanTarget(prev => [prev[0], size.y / 2, prev[2]])
   }, [size.y])
 
-  // Keyboard listener for panning
-  useEffect(() => {
-    console.log("Adding keydown listener for panning.");
-    const handleKeyDown = (event: KeyboardEvent) => {
-      console.log(`Key pressed: ${event.key}, Shift: ${event.shiftKey}`);
-      if (event.shiftKey) {
-        const panSpeed = 0.1
-        const maxPan = size.x / 2
+  // Keyboard handler for panning
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.shiftKey) {
+      const panSpeed = 0.1
+      const maxPan = size.x / 2
 
-        if (event.key === 'ArrowLeft') {
-          console.log("Panning left");
-          setPanTarget(prev => [Math.max(-maxPan, prev[0] - panSpeed), prev[1], prev[2]])
-        } else if (event.key === 'ArrowRight') {
-          console.log("Panning right");
-          setPanTarget(prev => [Math.min(maxPan, prev[0] + panSpeed), prev[1], prev[2]])
-        }
+      if (event.key === 'ArrowLeft') {
+        setPanTarget(prev => [Math.max(-maxPan, prev[0] - panSpeed), prev[1], prev[2]])
+      } else if (event.key === 'ArrowRight') {
+        setPanTarget(prev => [Math.min(maxPan, prev[0] + panSpeed), prev[1], prev[2]])
       }
     }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [size.x])
-
+  }
 
   // Calculate initial camera position
   const maxDim = Math.max(size.x, size.y, size.z)
@@ -178,17 +166,32 @@ export function Scene() {
   const maxDim = Math.max(size.x, size.y, size.z)
   const initialCameraPosition: [number, number, number] = [maxDim * 0.75, maxDim * 0.75, maxDim * 0.75]
 
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Focus the canvas wrapper on mount to receive key events
+    wrapperRef.current?.focus()
+  }, [])
+
   return (
-    <Canvas
-      shadows
-      camera={{ position: initialCameraPosition, fov: 50 }}
-      gl={{
-        antialias: true,
-        toneMapping: ACESFilmicToneMapping,
-        toneMappingExposure: 1.2,
-      }}
+    <div 
+      ref={wrapperRef}
+      onKeyDown={handleKeyDown} 
+      tabIndex={0} 
+      className="h-full w-full outline-none"
+      onClick={() => wrapperRef.current?.focus()}
     >
-      <SceneContent />
-    </Canvas>
+      <Canvas
+        shadows
+        camera={{ position: initialCameraPosition, fov: 50 }}
+        gl={{
+          antialias: true,
+          toneMapping: ACESFilmicToneMapping,
+          toneMappingExposure: 1.2,
+        }}
+      >
+        <SceneContent />
+      </Canvas>
+    </div>
   )
 }

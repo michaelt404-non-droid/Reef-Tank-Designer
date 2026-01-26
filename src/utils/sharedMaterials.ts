@@ -13,13 +13,18 @@ export function getSharedLambertMaterial(color: string, options?: {
   const key = `lambert-${color}-${options?.side ?? THREE.FrontSide}-${options?.flatShading ?? false}-${options?.emissive ?? 'none'}-${options?.emissiveIntensity ?? 0}`
 
   if (!materialCache.has(key)) {
-    const material = new THREE.MeshLambertMaterial({
+    const materialProps: THREE.MeshLambertMaterialParameters = {
       color: new THREE.Color(color),
       side: options?.side ?? THREE.FrontSide,
       flatShading: options?.flatShading ?? false,
-      emissive: options?.emissive ? new THREE.Color(options.emissive) : undefined,
-      emissiveIntensity: options?.emissiveIntensity ?? 0,
-    })
+    };
+
+    if (options?.emissive) {
+      materialProps.emissive = new THREE.Color(options.emissive);
+      materialProps.emissiveIntensity = options.emissiveIntensity ?? 1;
+    }
+
+    const material = new THREE.MeshLambertMaterial(materialProps)
     materialCache.set(key, material)
   }
 
