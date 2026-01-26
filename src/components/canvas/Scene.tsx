@@ -21,7 +21,7 @@ import { useEquipmentStore } from '../../stores/equipmentStore'
 import { useLightStore } from '../../stores/lightStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTankStore } from '../../stores/tankStore'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { ACESFilmicToneMapping } from 'three'
 
 // Convert inches to 3D units (1 inch = 0.1 units for nice scale)
@@ -43,8 +43,35 @@ function SceneContent() {
     z: dimensions.width * SCALE,
   }), [dimensions])
 
-  // Calculate camera target (center of the tank vertically)
-  const cameraTarget: [number, number, number] = [0, size.y / 2, 0]
+  // State for camera panning
+  const [panTarget, setPanTarget] = useState<[number, number, number]>([0, size.y / 2, 0])
+
+  // Update pan target's Y when tank height changes
+  useEffect(() => {
+    setPanTarget(prev => [prev[0], size.y / 2, prev[2]])
+  }, [size.y])
+
+  // Keyboard listener for panning
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.shiftKey) {
+        const panSpeed = 0.1
+        const maxPan = size.x / 2
+
+        if (event.key === 'ArrowLeft') {
+          setPanTarget(prev => [Math.max(-maxPan, prev[0] - panSpeed), prev[1], prev[2]])
+        } else if (event.key === 'ArrowRight') {
+          setPanTarget(prev => [Math.min(maxPan, prev[0] + panSpeed), prev[1], prev[2]])
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [size.x])
+
 
   // Calculate initial camera position
   const maxDim = Math.max(size.x, size.y, size.z)
@@ -129,7 +156,7 @@ function SceneContent() {
         minDistance={maxDim * 0.5}
         maxDistance={maxDim * 3.0}
         maxPolarAngle={Math.PI / 2 - 0.1}
-        target={cameraTarget}
+        target={panTarget}
         enableDamping
         dampingFactor={0.05}
       />
