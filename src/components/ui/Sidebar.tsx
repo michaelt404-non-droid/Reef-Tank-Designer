@@ -18,6 +18,8 @@ import { SaveLoadControls } from './SaveLoadControls'
 import { SimulationPanel } from './SimulationPanel'
 import { UndoRedoControls } from './UndoRedoControls'
 import { useSimulationStore } from '../../stores/simulationStore'
+import { useAuthStore } from '../../stores/authStore'
+import { useUIStore } from '../../stores/uiStore'
 
 type DesignTab = 'tank' | 'rocks' | 'lights' | 'corals' | 'fish' | 'equipment'
 
@@ -65,16 +67,32 @@ export function Sidebar() {
   const setMode = useSimulationStore((state) => state.setMode)
   const [activeTab, setActiveTab] = useState<DesignTab>('tank')
 
+  const { user, signOut } = useAuthStore()
+  const { toggleAuthModal } = useUIStore()
+
   return (
     <aside className="w-80 bg-gray-800/90 backdrop-blur border-r border-gray-700 flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-xl font-bold text-white">Reef Tank Designer</h1>
             <p className="text-sm text-gray-400">Plan your perfect reef</p>
           </div>
           {mode === 'design' && <UndoRedoControls />}
+        </div>
+        {/* Auth Section */}
+        <div className="text-right">
+          {user ? (
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-xs text-gray-400 truncate max-w-[120px]">{user.email}</span>
+              <button onClick={signOut} className="text-xs font-medium text-red-400 hover:text-red-300">Logout</button>
+            </div>
+          ) : (
+            <button onClick={toggleAuthModal} className="text-sm font-medium text-blue-400 hover:text-blue-300">
+              Login / Sign Up
+            </button>
+          )}
         </div>
       </div>
 

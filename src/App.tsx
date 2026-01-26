@@ -3,6 +3,7 @@ import { Scene } from './components/canvas/Scene'
 import { Sidebar } from './components/ui/Sidebar'
 import { OnboardingTutorial } from './components/ui/OnboardingTutorial'
 import { LoadingScreen } from './components/ui/LoadingScreen'
+import { Auth } from './components/ui/Auth'
 import { useUIStore } from './stores/uiStore'
 import { useRockStore } from './stores/rockStore'
 import { useCoralStore } from './stores/coralStore'
@@ -286,6 +287,9 @@ function App() {
 
       {/* Onboarding tutorial (shows on first visit) */}
       <OnboardingTutorial />
+
+      {/* Auth Modal */}
+      <Auth />
 
       <div className="flex h-screen w-screen">
         <Sidebar />
