@@ -53,14 +53,18 @@ function SceneContent() {
 
   // Keyboard listener for panning
   useEffect(() => {
+    console.log("Adding keydown listener for panning.");
     const handleKeyDown = (event: KeyboardEvent) => {
+      console.log(`Key pressed: ${event.key}, Shift: ${event.shiftKey}`);
       if (event.shiftKey) {
         const panSpeed = 0.1
         const maxPan = size.x / 2
 
         if (event.key === 'ArrowLeft') {
+          console.log("Panning left");
           setPanTarget(prev => [Math.max(-maxPan, prev[0] - panSpeed), prev[1], prev[2]])
         } else if (event.key === 'ArrowRight') {
+          console.log("Panning right");
           setPanTarget(prev => [Math.min(maxPan, prev[0] + panSpeed), prev[1], prev[2]])
         }
       }
