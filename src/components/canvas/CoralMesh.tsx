@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect, Suspense } from 'react'
+import { useRef, useMemo, useEffect, Suspense, memo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -12,6 +12,7 @@ import { useHistoryStore } from '../../stores/historyStore'
 import { CORAL_INFO } from '../../data/corals'
 import { getCoralPARStatus } from '../../utils/parCalculator'
 import { useDrag3D } from '../../hooks/useDrag3D'
+import { getIndicatorGeometry, getSharedBasicMaterial, getSharedLambertMaterial } from '../../utils/sharedMaterials'
 
 // Inline types to avoid Safari import issues
 type CoralType = 'mushrooms' | 'zoanthids' | 'softCorals' | 'lps' | 'sps' | 'acropora'
@@ -56,18 +57,13 @@ function ModelCoral({
     return baseColor.lerp(whiteColor, 1 - (colorIntensity ?? 1))
   }, [color, colorIntensity])
 
-  const cartoonMaterial = useMemo(() => new THREE.MeshLambertMaterial({
-    color: displayColor,
+  const cartoonMaterial = getSharedLambertMaterial(`#${displayColor.getHexString()}`, {
     side: THREE.DoubleSide,
-    flatShading: false,
-    emissive: displayColor,
+    emissive: `#${displayColor.getHexString()}`,
     emissiveIntensity: 0.15,
-  }), [displayColor])
+  })
 
-  const outlineMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0x000000,
-    side: THREE.BackSide,
-  }), [])
+  const outlineMaterial = getSharedBasicMaterial(0x000000, { side: THREE.BackSide })
 
   // Bleaching overlay material - white with top-to-bottom gradient
   const bleachMaterial = useMemo(() => {
@@ -138,10 +134,7 @@ function ModelCoral({
     })
 
     return () => {
-      if (!preserveOriginalMaterials) {
-        cartoonMaterial.dispose()
-        outlineMaterial.dispose()
-      }
+      // Only dispose of the unique bleach material. Shared materials are managed centrally.
       bleachMaterial.dispose()
       bleachOverlaysRef.current = []
     }
@@ -159,7 +152,7 @@ function getStatusColor(status: PARStatus): number {
 }
 
 // --- Main Coral Component ---
-export function CoralMesh({ coral }: CoralMeshProps) {
+const CoralMeshComponent = ({ coral }: CoralMeshProps) => {
   const groupRef = useRef<THREE.Group>(null)
   const isDraggingRef = useRef(false)
 
@@ -186,6 +179,11 @@ export function CoralMesh({ coral }: CoralMeshProps) {
   )
 
   const parStatus = useMemo(() => getCoralPARStatus(coral.coralType, { x: coral.position[0], y: coral.position[1], z: coral.position[2] }, lights), [coral.coralType, coral.position, lights])
+  const parStatusMaterial = getSharedBasicMaterial(getStatusColor(parStatus.status))
+
+  // Health indicator material
+  const healthColor = (coral.health ?? 1) < 0.4 ? '#ef4444' : '#eab308';
+  const healthMaterial = getSharedBasicMaterial(healthColor, { transparent: true, opacity: 0.8 });
 
   // Calculate bounds for dragging
   const dragBounds = useMemo(() => {
@@ -295,17 +293,21 @@ export function CoralMesh({ coral }: CoralMeshProps) {
 
       {/* Indicators */}
       {isSelected && (
-        <mesh position={[0, 1.5 / coral.scale, 0]}>
-          <sphereGeometry args={[0.1 / coral.scale, 8, 8]} />
-          <meshBasicMaterial color={getStatusColor(parStatus.status)} />
-        </mesh>
+        <mesh 
+          position={[0, 1.5 / coral.scale, 0]}
+          geometry={getIndicatorGeometry('large')}
+          material={parStatusMaterial} 
+        />
       )}
       {isSimulating && !isSelected && (coral.health ?? 1) < 0.7 && (
-        <mesh position={[0, 1.2 / coral.scale, 0]}>
-          <sphereGeometry args={[0.06 / coral.scale, 6, 6]} />
-          <meshBasicMaterial color={(coral.health ?? 1) < 0.4 ? '#ef4444' : '#eab308'} transparent opacity={0.8} />
-        </mesh>
+        <mesh 
+          position={[0, 1.2 / coral.scale, 0]}
+          geometry={getIndicatorGeometry('small')}
+          material={healthMaterial}
+        />
       )}
     </group>
   )
 }
+
+export const CoralMesh = memo(CoralMeshComponent)

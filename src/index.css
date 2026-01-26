@@ -17,3 +17,76 @@ body {
   background-color: #1a1a2e;
   color: #eee;
 }
+
+/* Mobile scroll support */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Ensure scrollbar is always visible and usable on mobile */
+.scrollable-panel {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Custom scrollbar styling for better visibility */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: rgba(55, 65, 81, 0.3);
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.6);
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.8);
+}
+
+/* Firefox scrollbar */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(107, 114, 128, 0.6) rgba(55, 65, 81, 0.3);
+}
+
+/* Ensure native select dropdowns work on mobile */
+select {
+  -webkit-appearance: menulist;
+  appearance: menulist;
+  touch-action: manipulation;
+}
+
+/* Fix for iOS select dropdown scroll */
+select:focus {
+  font-size: 16px; /* Prevents zoom on iOS */
+}
+
+/* Ensure details/summary dropdowns work on mobile */
+details {
+  touch-action: manipulation;
+}
+
+details summary {
+  touch-action: manipulation;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Make sure range inputs work on mobile */
+input[type="range"] {
+  touch-action: pan-x;
+  -webkit-appearance: none;
+}
+
+/* Ensure buttons respond to touch */
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}

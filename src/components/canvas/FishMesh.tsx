@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect, Suspense } from 'react'
+import { useRef, useMemo, useEffect, Suspense, memo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -6,6 +6,7 @@ import { useFishStore } from '../../stores/fishStore'
 import { useTankStore } from '../../stores/tankStore'
 import { useSimulationStore } from '../../stores/simulationStore'
 import { FISH_INFO } from '../../data/fish'
+import { getSelectionMaterial, getHealthMaterial, getIndicatorGeometry, getSharedLambertMaterial, getSharedBasicMaterial } from '../../utils/sharedMaterials'
 import type { FishInfo } from '../../data/fish'
 
 // Simplified PlacedFish type for this component
@@ -42,20 +43,15 @@ function ModelFish({
   // Memoize the cloned scene to prevent re-creation on every render
   const clonedScene = useMemo(() => scene.clone(), [scene])
 
-  const cartoonMaterial = useMemo(() => new THREE.MeshLambertMaterial({
-    color: new THREE.Color(fish.color),
+  const cartoonMaterial = getSharedLambertMaterial(fish.color, {
     side: THREE.DoubleSide,
-    flatShading: false, // Use smooth shading for a fuller look
-    emissive: new THREE.Color(fish.color),
+    emissive: fish.color,
     emissiveIntensity: 0.1,
-  }), [fish.color])
+  })
 
-  const outlineMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0x000000,
-    side: THREE.BackSide,
-  }), [])
+  const outlineMaterial = getSharedBasicMaterial(0x000000, { side: THREE.BackSide })
 
-  // Apply materials and dispose of them on cleanup
+  // Apply materials
   useEffect(() => {
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
@@ -68,7 +64,6 @@ function ModelFish({
         }
 
         // For built-in models, apply cartoon styling
-        // The outline mesh will use a different material
         const outlineMesh = child.clone()
         outlineMesh.material = outlineMaterial
         outlineMesh.scale.multiplyScalar(1.05)
@@ -78,13 +73,7 @@ function ModelFish({
         child.material = cartoonMaterial
       }
     })
-
-    return () => {
-      if (!preserveOriginalMaterials) {
-        cartoonMaterial.dispose()
-        outlineMaterial.dispose()
-      }
-    }
+    // No cleanup function needed here because materials are shared and managed centrally.
   }, [clonedScene, cartoonMaterial, outlineMaterial, preserveOriginalMaterials])
 
   return <primitive object={clonedScene} />
@@ -92,7 +81,7 @@ function ModelFish({
 
 
 // --- Main Fish Component ---
-export function FishMesh({ fish }: FishMeshProps) {
+const FishMeshComponent = ({ fish }: FishMeshProps) => {
   const groupRef = useRef<THREE.Group>(null)
   const updateFish = useFishStore((state) => state.updateFish)
   const selectFish = useFishStore((state) => state.selectFish)
@@ -374,14 +363,7 @@ export function FishMesh({ fish }: FishMeshProps) {
   })
 
   // --- Health Indicator ---
-  const getHealthColor = () => {
-    if (!isSimulating) return null
-    if (fish.health < 0.3) return '#ef4444' // Red
-    if (fish.hunger > 0.7) return '#f97316' // Orange
-    if (fish.health < 0.6 || fish.hunger > 0.5) return '#eab308' // Yellow
-    return null
-  }
-  const healthColor = getHealthColor()
+  const healthMaterial = isSimulating ? getHealthMaterial(fish.health, fish.hunger) : null
 
   if (!fishInfo || !fishInfo.modelPath) {
     // Fallback if model info is missing
@@ -414,17 +396,21 @@ export function FishMesh({ fish }: FishMeshProps) {
 
       {/* Selection and Health Indicators */}
       {isSelected && (
-        <mesh position={[0, 0.8 / fish.scale, 0]}>
-          <sphereGeometry args={[0.1 / fish.scale, 8, 8]} />
-          <meshBasicMaterial color="#22c55e" />
-        </mesh>
+        <mesh
+          position={[0, 0.8 / fish.scale, 0]}
+          geometry={getIndicatorGeometry('large')}
+          material={getSelectionMaterial()}
+        />
       )}
-      {healthColor && !isSelected && (
-        <mesh position={[0, 0.6 / fish.scale, 0]}>
-          <sphereGeometry args={[0.06 / fish.scale, 6, 6]} />
-          <meshBasicMaterial color={healthColor} transparent opacity={0.8} />
-        </mesh>
+      {healthMaterial && !isSelected && (
+        <mesh
+          position={[0, 0.6 / fish.scale, 0]}
+          geometry={getIndicatorGeometry('small')}
+          material={healthMaterial}
+        />
       )}
     </group>
   )
 }
+
+export const FishMesh = memo(FishMeshComponent)

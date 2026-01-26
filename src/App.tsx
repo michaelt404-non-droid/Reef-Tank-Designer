@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Scene } from './components/canvas/Scene'
 import { Sidebar } from './components/ui/Sidebar'
+import { OnboardingTutorial } from './components/ui/OnboardingTutorial'
+import { LoadingScreen } from './components/ui/LoadingScreen'
 import { useUIStore } from './stores/uiStore'
 import { useRockStore } from './stores/rockStore'
 import { useCoralStore } from './stores/coralStore'
@@ -12,8 +14,18 @@ import { autoSave, autoRestore, hasAutoSave } from './utils/saveLoad'
 import { getRockBounds, getTankBounds, clampRockPosition } from './utils/rockBounds'
 
 function App() {
+  const [isLoading, setIsLoading] = useState(true)
   const cameraLocked = useUIStore((state) => state.cameraLocked)
   const toggleCameraLock = useUIStore((state) => state.toggleCameraLock)
+
+  // Initial loading simulation (models, etc.)
+  useEffect(() => {
+    // Give the 3D scene time to initialize
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Rock movement and rotation
   const selectedRockId = useRockStore((state) => state.selectedRockId)
@@ -268,10 +280,17 @@ function App() {
   ])
 
   return (
-    <div className="flex h-screen w-screen">
-      <Sidebar />
-      <main className="flex-1 relative">
-        <Scene />
+    <>
+      {/* Loading screen */}
+      <LoadingScreen isLoading={isLoading} message="Initializing 3D environment..." />
+
+      {/* Onboarding tutorial (shows on first visit) */}
+      <OnboardingTutorial />
+
+      <div className="flex h-screen w-screen">
+        <Sidebar />
+        <main className="flex-1 relative">
+          <Scene />
 
         {/* Floating Controls - Different for design vs simulation mode */}
         {mode === 'simulation' ? (
@@ -329,6 +348,7 @@ function App() {
         )}
       </main>
     </div>
+    </>
   )
 }
 

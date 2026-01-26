@@ -1,4 +1,5 @@
 import { useSimulationStore, PARAM_RANGES, DIFFICULTY_CONFIG } from '../../stores/simulationStore'
+import { HelpTooltip } from './Tooltip'
 
 // Inline types to avoid Safari issues
 type WaterParams = {
@@ -18,19 +19,19 @@ type WaterParams = {
 
 type ParamStatus = 'optimal' | 'acceptable' | 'warning' | 'critical'
 
-const PARAM_LABELS: Record<keyof WaterParams, { name: string; unit: string }> = {
-  temperature: { name: 'Temperature', unit: '°F' },
-  salinity: { name: 'Salinity', unit: 'ppt' },
-  ph: { name: 'pH', unit: '' },
-  nitrate: { name: 'Nitrate', unit: 'ppm' },
-  ammonia: { name: 'Ammonia', unit: 'ppm' },
-  nitrite: { name: 'Nitrite', unit: 'ppm' },
-  phosphate: { name: 'Phosphate', unit: 'ppm' },
-  alkalinity: { name: 'Alkalinity', unit: 'dKH' },
-  calcium: { name: 'Calcium', unit: 'ppm' },
-  magnesium: { name: 'Magnesium', unit: 'ppm' },
-  potassium: { name: 'Potassium', unit: 'ppm' },
-  strontium: { name: 'Strontium', unit: 'ppm' },
+const PARAM_LABELS: Record<keyof WaterParams, { name: string; unit: string; help: string }> = {
+  temperature: { name: 'Temperature', unit: '°F', help: 'Ideal: 76-82°F. Too cold slows metabolism, too hot causes stress.' },
+  salinity: { name: 'Salinity', unit: 'ppt', help: 'Ideal: 34-36 ppt. Affects osmotic balance in fish and corals.' },
+  ph: { name: 'pH', unit: '', help: 'Ideal: 8.1-8.4. Affected by CO2, alkalinity, and biological processes.' },
+  nitrate: { name: 'Nitrate', unit: 'ppm', help: 'Ideal: <10 ppm. End product of nitrogen cycle. High levels fuel algae growth.' },
+  ammonia: { name: 'Ammonia', unit: 'ppm', help: 'Ideal: 0 ppm. Toxic to fish! Produced by waste, converted by bacteria in live rock.' },
+  nitrite: { name: 'Nitrite', unit: 'ppm', help: 'Ideal: 0 ppm. Toxic intermediate in nitrogen cycle. Bacteria convert it to nitrate.' },
+  phosphate: { name: 'Phosphate', unit: 'ppm', help: 'Ideal: <0.03 ppm. High levels promote algae and inhibit coral growth.' },
+  alkalinity: { name: 'Alkalinity', unit: 'dKH', help: 'Ideal: 8-12 dKH. Buffers pH and is consumed by corals for skeleton building.' },
+  calcium: { name: 'Calcium', unit: 'ppm', help: 'Ideal: 400-450 ppm. Essential for coral skeleton growth.' },
+  magnesium: { name: 'Magnesium', unit: 'ppm', help: 'Ideal: 1280-1350 ppm. Helps maintain calcium and alkalinity balance.' },
+  potassium: { name: 'Potassium', unit: 'ppm', help: 'Ideal: 380-420 ppm. Important for coral coloration.' },
+  strontium: { name: 'Strontium', unit: 'ppm', help: 'Ideal: 8-10 ppm. Trace element used in coral calcification.' },
 }
 
 function getStatusColor(status: ParamStatus): string {
@@ -59,7 +60,7 @@ interface ParamGaugeProps {
 }
 
 function ParamGauge({ param, value, status, compact }: ParamGaugeProps) {
-  const { name, unit } = PARAM_LABELS[param]
+  const { name, unit, help } = PARAM_LABELS[param]
   const [min, idealLow, idealHigh, max] = PARAM_RANGES[param]
 
   // Calculate position on gauge (0-100)
@@ -75,7 +76,10 @@ function ParamGauge({ param, value, status, compact }: ParamGaugeProps) {
   if (compact) {
     return (
       <div className="flex items-center justify-between py-1">
-        <span className="text-xs text-gray-400">{name}</span>
+        <span className="text-xs text-gray-400 flex items-center gap-1">
+          {name}
+          <HelpTooltip content={help} position="right" />
+        </span>
         <span className={`text-xs font-medium ${getStatusColor(status)}`}>
           {displayValue}{unit && ` ${unit}`}
         </span>
@@ -86,7 +90,10 @@ function ParamGauge({ param, value, status, compact }: ParamGaugeProps) {
   return (
     <div className="bg-gray-700/30 rounded p-2">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-300">{name}</span>
+        <span className="text-xs text-gray-300 flex items-center gap-1">
+          {name}
+          <HelpTooltip content={help} position="right" />
+        </span>
         <span className={`text-sm font-medium ${getStatusColor(status)}`}>
           {displayValue}{unit && ` ${unit}`}
         </span>
@@ -158,8 +165,8 @@ export function WaterQualityDisplay() {
       {/* Dosing controls for expert mode */}
       {difficulty === 'expert' && (
         <div className="pt-2 border-t border-gray-700">
-          <details className="group">
-            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300">
+          <details className="group" style={{ touchAction: 'manipulation' }}>
+            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-300 select-none" style={{ WebkitTapHighlightColor: 'transparent' }}>
               Dosing Controls
             </summary>
             <div className="mt-2 grid grid-cols-2 gap-1">

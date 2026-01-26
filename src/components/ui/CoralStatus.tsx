@@ -1,5 +1,6 @@
 import { useCoralStore } from '../../stores/coralStore'
 import { CORAL_INFO } from '../../data/corals'
+import { HelpTooltip } from './Tooltip'
 
 export function CoralStatus() {
   const corals = useCoralStore((state) => state.corals)
@@ -48,7 +49,10 @@ export function CoralStatus() {
         {/* Average Health */}
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-400">Avg Health</span>
+            <span className="text-gray-400 flex items-center gap-1">
+              Avg Health
+              <HelpTooltip content="Overall coral health. Affected by PAR (light level) and water quality. Place corals in their ideal PAR zone." position="right" />
+            </span>
             <span className={getStatusColor(avgHealth)}>{Math.round(avgHealth * 100)}%</span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -62,7 +66,10 @@ export function CoralStatus() {
         {/* Average Color Intensity */}
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-400">Color Vibrancy</span>
+            <span className="text-gray-400 flex items-center gap-1">
+              Color Vibrancy
+              <HelpTooltip content="Color intensity. Corals bleach (lose color) when stressed. Color recovers slowly when conditions improve." position="right" />
+            </span>
             <span className={getStatusColor(avgColor)}>{Math.round(avgColor * 100)}%</span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -76,7 +83,10 @@ export function CoralStatus() {
         {/* Average Growth */}
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-400">Avg Growth</span>
+            <span className="text-gray-400 flex items-center gap-1">
+              Avg Growth
+              <HelpTooltip content="Growth progress toward full size. Corals grow when healthy with good PAR and water quality. SPS corals grow slower than soft corals." position="right" />
+            </span>
             <span className="text-blue-400">{Math.round(avgGrowth * 100)}%</span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">

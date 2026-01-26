@@ -1,5 +1,6 @@
 import { useFishStore } from '../../stores/fishStore'
 import { FISH_INFO } from '../../data/fish'
+import { HelpTooltip } from './Tooltip'
 
 export function FishStatus() {
   const fish = useFishStore((state) => state.fish)
@@ -50,7 +51,10 @@ export function FishStatus() {
         {/* Average Health */}
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-400">Avg Health</span>
+            <span className="text-gray-400 flex items-center gap-1">
+              Avg Health
+              <HelpTooltip content="Overall fish health. Affected by hunger, water quality, and stress. Keep fish well-fed for good health." position="right" />
+            </span>
             <span className={getStatusColor(avgHealth)}>{Math.round(avgHealth * 100)}%</span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -64,7 +68,10 @@ export function FishStatus() {
         {/* Average Hunger (inverse - full is good) */}
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-400">Avg Fullness</span>
+            <span className="text-gray-400 flex items-center gap-1">
+              Avg Fullness
+              <HelpTooltip content="How well-fed your fish are. Feed regularly to keep them healthy. Hungry fish will actively seek food." position="right" />
+            </span>
             <span className={getStatusColor(avgHunger, true)}>{Math.round((1 - avgHunger) * 100)}%</span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -78,7 +85,10 @@ export function FishStatus() {
         {/* Average Stress (inverse - calm is good) */}
         <div>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-400">Avg Calmness</span>
+            <span className="text-gray-400 flex items-center gap-1">
+              Avg Calmness
+              <HelpTooltip content="Lower stress = happier fish. Stress is reduced by feeding and stable water conditions. New fish start slightly stressed." position="right" />
+            </span>
             <span className={getStatusColor(avgStress, true)}>{Math.round((1 - avgStress) * 100)}%</span>
           </div>
           <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">

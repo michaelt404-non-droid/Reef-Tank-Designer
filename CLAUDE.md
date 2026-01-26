@@ -294,6 +294,63 @@ rate = baseRate × nutrientFactor × lightFactor × (1 - cleanupCrewReduction)
 - **Custom Coral Models:** Added ability to upload custom `.glb` coral models (same as fish). Custom models preserve their original textures/materials instead of applying cartoon coloring.
 - **Preserve Original Materials:** Custom uploaded GLB files (fish and coral) now keep their original textures instead of having a solid color applied on top.
 
+## Session Notes (Jan 25, 2026 - Session 3)
+
+### Completed This Session:
+- **Live Rock Bacterial Filtration**: Rocks now simulate beneficial bacteria populations
+  - Rock volume determines bacterial capacity
+  - With sufficient rock, ammonia and nitrite stay at/near zero
+  - Less rock = slower processing, parameters can build up
+  - More realistic nitrogen cycle simulation
+
+- **Dead Organism Ammonia Spikes**: Dead fish and corals now produce ammonia
+  - Dead fish produce 0.05 ammonia per sim hour
+  - Dead corals produce 0.02 ammonia per sim hour
+  - Ammonia continues until dead organism is removed
+  - Encourages proper tank maintenance
+
+- **Mobile Scroll/Touch Fixes**: Improved touch controls for mobile devices
+  - Added `-webkit-overflow-scrolling: touch` for sidebar scroll
+  - Added `touch-action: manipulation` for interactive elements
+  - Fixed iOS zoom issue on select inputs (font-size: 16px)
+  - Improved dropdown/details element touch handling
+  - Custom scrollbar styling for visibility
+
+### Files Modified This Session:
+- `src/stores/simulationStore.ts` - bacterial capacity from rocks, dead organism ammonia
+- `src/index.css` - mobile scroll and touch improvements
+- `src/components/ui/Sidebar.tsx` - scrollable-panel class for touch
+- `src/components/ui/WaterQualityDisplay.tsx` - touch-friendly dosing dropdown, parameter tooltips
+
+### Phase 8 Completed:
+- **Loading Screen** (`LoadingScreen.tsx`) - animated loading screen with fish icon
+- **Onboarding Tutorial** (`OnboardingTutorial.tsx`) - 9-step walkthrough for new users
+  - Shows on first visit, stored in localStorage
+  - "View Tutorial" button in Tank tab to replay
+  - Step-by-step cards with progress indicator
+- **Tooltip System** (`Tooltip.tsx`) - reusable tooltip and help icon components
+- **Help Tooltips Added**:
+  - All 12 water parameters with ideal values and explanations
+  - Fish status (health, fullness, calmness)
+  - Coral status (health, color vibrancy, growth)
+
+### New Files Created:
+- `src/components/ui/Tooltip.tsx` - Tooltip and HelpTooltip components
+- `src/components/ui/LoadingScreen.tsx` - LoadingScreen and LoadingSpinner
+- `src/components/ui/OnboardingTutorial.tsx` - Tutorial system with ShowTutorialButton
+
+### Key Algorithm - Bacterial Filtration:
+```
+bacterialCapacity = sum(rock.scale * 10) for all rocks
+processingEfficiency = min(1, bacterialCapacity / (fishCount + 1) * 5)
+ammoniaConsumption = ammonia * (0.1 + processingEfficiency * 0.9) * simHours
+nitriteConsumption = nitrite * (0.08 + processingEfficiency * 0.92) * simHours
+```
+
+With enough rock (roughly 1 rock per 2 fish), bacteria fully process ammonia/nitrite to zero.
+
+---
+
 ## Session Notes (Jan 25, 2026 - Session 2)
 
 ### Completed This Session:
@@ -352,13 +409,13 @@ rate = baseRate × nutrientFactor × lightFactor × (1 - cleanupCrewReduction)
 ## Future Phases - Deployment & Marketing
 
 ### Phase 8: Polish & UX
-- [ ] Onboarding tutorial / first-time user guide
-- [ ] Tooltips and help text throughout UI
-- [ ] Undo/Redo functionality
-- [ ] Keyboard shortcuts
-- [ ] Better mobile touch controls
+- [x] Onboarding tutorial / first-time user guide
+- [x] Tooltips and help text throughout UI
+- [x] Undo/Redo functionality (Ctrl+Z/Ctrl+Y, historyStore)
+- [x] Keyboard shortcuts (L=lock camera, WASD=move, Arrows=rotate)
+- [x] Better mobile touch controls (scroll, dropdowns, touch-action)
+- [x] Loading states and progress indicators
 - [ ] Performance optimization for lower-end devices
-- [ ] Loading states and progress indicators
 
 ### Phase 9: Web Deployment
 - [ ] Production build optimization

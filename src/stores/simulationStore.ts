@@ -1,4 +1,7 @@
 import { create } from 'zustand'
+import { useRockStore } from './rockStore'
+import { useFishStore } from './fishStore'
+import { useCoralStore } from './coralStore'
 
 // Inline types to avoid Safari import issues
 type Difficulty = 'beginner' | 'intermediate' | 'expert'
@@ -193,6 +196,35 @@ function calculateBioload(fishCount: number): number {
   return fishCount * 0.002 // per simulation hour
 }
 
+// Calculate bacterial capacity from live rock
+// More rock = more beneficial bacteria = better ammonia/nitrite processing
+function calculateBacterialCapacity(): number {
+  const rocks = useRockStore.getState().rocks
+  if (rocks.length === 0) return 0
+
+  // Each rock contributes based on its scale (larger rocks = more surface area for bacteria)
+  let totalCapacity = 0
+  for (const rock of rocks) {
+    // Base capacity per rock, scaled by size
+    // Rock scale is typically 0.2-0.5, so multiply by 10 for reasonable values
+    totalCapacity += rock.scale * 10
+  }
+
+  return totalCapacity
+}
+
+// Count dead fish (health = 0) that haven't been removed
+function countDeadFish(): number {
+  const fish = useFishStore.getState().fish
+  return fish.filter(f => f.health <= 0).length
+}
+
+// Count dead corals (health = 0) that haven't been removed
+function countDeadCorals(): number {
+  const corals = useCoralStore.getState().corals
+  return corals.filter(c => c.health <= 0).length
+}
+
 export const useSimulationStore = create<SimulationState>((set, get) => ({
   // Initial state
   isRunning: false,
@@ -277,18 +309,49 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     const simHours = deltaSimSeconds / 3600
     const params = { ...state.waterParams }
 
-    // Ammonia cycle: ammonia -> nitrite -> nitrate
-    // Fish produce ammonia, bacteria convert it
-    const bioload = calculateBioload(10) * simHours * diffConfig.decayRate // TODO: get actual fish count
+    // Get actual fish count for bioload calculation
+    const fishCount = useFishStore.getState().fish.length
+    const deadFishCount = countDeadFish()
+    const deadCoralCount = countDeadCorals()
 
-    // Ammonia production and conversion
-    params.ammonia = Math.max(0, params.ammonia + bioload * 0.5 - params.ammonia * 0.1 * simHours)
-    // Ammonia converts to nitrite
-    const ammoniaToNitrite = params.ammonia * 0.05 * simHours
-    params.nitrite = Math.max(0, params.nitrite + ammoniaToNitrite - params.nitrite * 0.08 * simHours)
-    // Nitrite converts to nitrate
-    const nitriteToNitrate = params.nitrite * 0.1 * simHours
-    params.nitrate = Math.min(100, params.nitrate + nitriteToNitrate + bioload * 0.3)
+    // Calculate bioload from living fish
+    const bioload = calculateBioload(fishCount) * simHours * diffConfig.decayRate
+
+    // Dead organisms produce ammonia spikes until removed!
+    // Dead fish produce significant ammonia, dead corals produce less
+    const deadOrganismAmmonia = (deadFishCount * 0.05 + deadCoralCount * 0.02) * simHours * diffConfig.decayRate
+
+    // Calculate bacterial capacity from live rock
+    const bacterialCapacity = calculateBacterialCapacity()
+
+    // Bacteria processing rate depends on rock amount vs bioload
+    // If bacterial capacity >= bioload * 50, bacteria can fully process ammonia/nitrite
+    // Less rock = slower processing, more buildup
+    const processingEfficiency = Math.min(1, bacterialCapacity / Math.max(1, (fishCount + 1) * 5))
+
+    // Ammonia cycle: ammonia -> nitrite -> nitrate
+    // Fish and dead organisms produce ammonia, bacteria convert it
+
+    // Ammonia production from living fish and dead organisms
+    const ammoniaProduction = bioload * 0.5 + deadOrganismAmmonia
+
+    // Bacteria consume ammonia - more rock = faster processing
+    // With enough rock, bacteria keep ammonia at 0
+    const bacteriaAmmoniaConsumption = params.ammonia * (0.1 + processingEfficiency * 0.9) * simHours
+
+    params.ammonia = Math.max(0, params.ammonia + ammoniaProduction - bacteriaAmmoniaConsumption)
+
+    // Ammonia converts to nitrite (bacteria process)
+    const ammoniaToNitrite = bacteriaAmmoniaConsumption * 0.5
+
+    // Bacteria also consume nitrite - more rock = faster processing
+    const bacteriaNitriteConsumption = params.nitrite * (0.08 + processingEfficiency * 0.92) * simHours
+
+    params.nitrite = Math.max(0, params.nitrite + ammoniaToNitrite - bacteriaNitriteConsumption)
+
+    // Nitrite converts to nitrate (this is the end product, accumulates over time)
+    const nitriteToNitrate = bacteriaNitriteConsumption
+    params.nitrate = Math.min(100, params.nitrate + nitriteToNitrate + bioload * 0.1)
 
     // Phosphate accumulation
     params.phosphate = Math.min(1, params.phosphate + bioload * 0.05)

@@ -106,7 +106,7 @@ export function Sidebar() {
 
       {/* Simulation Mode - Minimal sidebar with just essential controls */}
       {mode === 'simulation' && (
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto scrollable-panel p-4" style={{ minHeight: 0 }}>
           <SimulationPanel />
         </div>
       )}
@@ -136,7 +136,7 @@ export function Sidebar() {
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto scrollable-panel p-4" style={{ minHeight: 0 }}>
             {activeTab === 'tank' && (
               <div className="space-y-2">
                 <CollapsibleSection title="Save / Load">

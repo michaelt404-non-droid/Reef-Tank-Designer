@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect, Suspense } from 'react'
+import { useRef, useMemo, useEffect, Suspense, memo } from 'react'
 import { useThree } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
@@ -10,6 +10,8 @@ import { useSimulationStore } from '../../stores/simulationStore'
 import { useHistoryStore } from '../../stores/historyStore'
 import { getRockBounds, getTankBounds } from '../../utils/rockBounds'
 import { useDrag3D } from '../../hooks/useDrag3D'
+import { getIndicatorGeometry, getSelectionMaterial, getSharedLambertMaterial } from '../../utils/sharedMaterials'
+
 
 type ProceduralRockType = 'boulder' | 'branch' | 'shelf' | 'pillar' | 'rubble' | 'cave' | 'arch'
 
@@ -229,7 +231,7 @@ function createProceduralGeometry(type: ProceduralRockType): THREE.BufferGeometr
   return geometry
 }
 
-export function RockMesh({ rock }: RockMeshProps) {
+const RockMeshComponent = ({ rock }: RockMeshProps) => {
   const groupRef = useRef<THREE.Group>(null)
 
   const { gl } = useThree()
@@ -261,7 +263,7 @@ export function RockMesh({ rock }: RockMeshProps) {
       maxX: tankBounds.halfX - rockBounds.halfX - margin,
       minY: sandBedHeight + yOffset,
       maxY: tankBounds.height - (isModelRock ? rockBounds.halfY * 2 : rockBounds.halfY) - margin,
-      minZ: -tankBounds.halfZ + rockBounds.halfZ + margin,
+      minZ: -tankBounds.halfZ + rockBounds.halfZ - margin,
       maxZ: tankBounds.halfZ - rockBounds.halfZ - margin,
     }
   }, [rock.type, rock.proceduralType, rock.scale, tankDimensions])
@@ -279,23 +281,20 @@ export function RockMesh({ rock }: RockMeshProps) {
     if (rock.type === 'procedural' && rock.proceduralType) {
       return createProceduralGeometry(rock.proceduralType)
     }
+    // Return a placeholder, though this path should ideally not be hit with valid data
     return new THREE.BoxGeometry(1, 1, 1)
   }, [rock.type, rock.proceduralType])
 
-  const material = useMemo(() => {
-    return new THREE.MeshLambertMaterial({
-      color: rock.color,
-      side: THREE.DoubleSide,
-      flatShading: true,
-    })
-  }, [rock.color])
+  const material = getSharedLambertMaterial(rock.color, { flatShading: true, side: THREE.DoubleSide })
 
+  // Dispose of unique procedural geometry on unmount
   useEffect(() => {
     return () => {
-      geometry.dispose()
-      material.dispose()
+      if (rock.type === 'procedural') {
+        geometry.dispose()
+      }
     }
-  }, [geometry, material])
+  }, [geometry, rock.type])
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (isSimulationMode) return
@@ -355,17 +354,19 @@ export function RockMesh({ rock }: RockMeshProps) {
       />
       {/* Selection indicator */}
       {isSelected && (
-        <mesh position={[rock.position[0], rock.position[1] + rock.scale * 1.2, rock.position[2]]}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshBasicMaterial color="#22c55e" />
-        </mesh>
+        <mesh
+          position={[rock.position[0], rock.position[1] + rock.scale * 1.2, rock.position[2]]}
+          geometry={getIndicatorGeometry('small')}
+          material={getSelectionMaterial()}
+        />
       )}
     </group>
   )
 }
 
-// Separate component for model rocks
-function ModelRock({
+export const RockMesh = memo(RockMeshComponent)
+
+const ModelRockComponent = ({
   rock,
   isSelected,
   onPointerDown,
@@ -377,7 +378,7 @@ function ModelRock({
   onPointerDown: (e: ThreeEvent<PointerEvent>) => void
   onClick: (e: ThreeEvent<MouseEvent>) => void
   onHover: (h: boolean) => void
-}) {
+}) => {
   const { scene } = useGLTF(rock.modelPath!)
   const clonedScene = useMemo(() => {
     const clone = scene.clone()
@@ -413,11 +414,14 @@ function ModelRock({
       />
       {/* Selection indicator */}
       {isSelected && (
-        <mesh position={[rock.position[0], rock.position[1] + rock.scale * 1.2, rock.position[2]]}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshBasicMaterial color="#22c55e" />
-        </mesh>
+        <mesh
+          position={[rock.position[0], rock.position[1] + rock.scale * 1.2, rock.position[2]]}
+          geometry={getIndicatorGeometry('small')}
+          material={getSelectionMaterial()}
+        />
       )}
     </group>
   )
 }
+
+const ModelRock = memo(ModelRockComponent)

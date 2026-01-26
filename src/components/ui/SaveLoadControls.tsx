@@ -7,6 +7,7 @@ import {
   exportToFile,
   importFromFile,
 } from '../../utils/saveLoad'
+import { ShowTutorialButton } from './OnboardingTutorial'
 
 // Helper to get saves list
 function getSavesList(): Record<string, { name: string; timestamp: number }> {
@@ -232,6 +233,11 @@ export function SaveLoadControls() {
       <p className="text-xs text-gray-500">
         Saves are stored in your browser. Export to keep a backup file.
       </p>
+
+      {/* Tutorial link */}
+      <div className="pt-2 border-t border-gray-700">
+        <ShowTutorialButton />
+      </div>
     </div>
   )
 }
