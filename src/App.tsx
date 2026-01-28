@@ -10,7 +10,6 @@ import { useCoralStore } from './stores/coralStore'
 import { useEquipmentStore } from './stores/equipmentStore'
 import { useTankStore } from './stores/tankStore'
 import { useSimulationStore } from './stores/simulationStore'
-import { useHistoryStore } from './stores/historyStore'
 import { autoSave, autoRestore, hasAutoSave } from './utils/saveLoad'
 import { getRockBounds, getTankBounds, clampRockPosition } from './utils/rockBounds'
 
@@ -35,16 +34,38 @@ function App() {
 
   // Tank dimensions for bounds
   const tankDimensions = useTankStore((state) => state.dimensions)
+  const tankUndo = useTankStore((state) => state.undo)
+  const tankRedo = useTankStore((state) => state.redo)
+  const canTankUndo = useTankStore((state) => state.canUndo)
+  const canTankRedo = useTankStore((state) => state.canRedo)
+
+  // Rock movement and rotation
+  const selectedRockId = useRockStore((state) => state.selectedRockId)
+  const rocks = useRockStore((state) => state.rocks)
+  const updateRock = useRockStore((state) => state.updateRock)
+  const rockUndo = useRockStore((state) => state.undo)
+  const rockRedo = useRockStore((state) => state.redo)
+  const canRockUndo = useRockStore((state) => state.canUndo)
+  const canRockUndo = useRockStore((state) => state.canUndo)
+  const canRockRedo = useRockStore((state) => state.canRedo)
 
   // Coral rotation
   const selectedCoralId = useCoralStore((state) => state.selectedCoralId)
   const corals = useCoralStore((state) => state.corals)
   const updateCoral = useCoralStore((state) => state.updateCoral)
+  const coralUndo = useCoralStore((state) => state.undo)
+  const coralRedo = useCoralStore((state) => state.redo)
+  const canCoralUndo = useCoralStore((state) => state.canUndo)
+  const canCoralRedo = useCoralStore((state) => state.canRedo)
 
   // Equipment rotation
   const selectedEquipmentId = useEquipmentStore((state) => state.selectedEquipmentId)
   const equipment = useEquipmentStore((state) => state.equipment)
   const updateEquipment = useEquipmentStore((state) => state.updateEquipment)
+  const equipmentUndo = useEquipmentStore((state) => state.undo)
+  const equipmentRedo = useEquipmentStore((state) => state.redo)
+  const canEquipmentUndo = useEquipmentStore((state) => state.canUndo)
+  const canEquipmentRedo = useEquipmentStore((state) => state.canRedo)
 
   // Simulation state
   const mode = useSimulationStore((state) => state.mode)
@@ -64,8 +85,6 @@ function App() {
       }
       hasRestored.current = true
     }
-    // Push initial snapshot after restore (or on fresh start)
-    useHistoryStore.getState().pushSnapshot('Initial State')
   }, [])
 
   // Auto-save on beforeunload
@@ -100,23 +119,47 @@ function App() {
         e.preventDefault()
         if (e.shiftKey) {
           // Ctrl+Shift+Z = Redo
-          useHistoryStore.getState().redo()
+          if (selectedEquipmentId && canEquipmentRedo) {
+            equipmentRedo()
+          } else if (selectedCoralId && canCoralRedo) {
+            coralRedo()
+          } else if (selectedRockId && canRockRedo) {
+            rockRedo()
+          } else if (canTankRedo) {
+            tankRedo()
+          }
         } else {
           // Ctrl+Z = Undo
-          useHistoryStore.getState().undo()
+          if (selectedEquipmentId && canEquipmentUndo) {
+            equipmentUndo()
+          } else if (selectedCoralId && canCoralUndo) {
+            coralUndo()
+          } else if (selectedRockId && canRockUndo) {
+            rockUndo()
+          } else if (canTankUndo) {
+            tankUndo()
+          }
         }
       }
 
       // Ctrl+Y = Redo (Windows alternative)
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault()
-        useHistoryStore.getState().redo()
+        if (selectedEquipmentId && canEquipmentRedo) {
+          equipmentRedo()
+        } else if (selectedCoralId && canCoralRedo) {
+          coralRedo()
+        } else if (selectedRockId && canRockRedo) {
+          rockRedo()
+        } else if (canTankRedo) {
+          tankRedo()
+        }
       }
     }
 
     window.addEventListener('keydown', handleUndoRedo)
     return () => window.removeEventListener('keydown', handleUndoRedo)
-  }, [mode])
+  }, [mode, selectedEquipmentId, selectedCoralId, selectedRockId, canTankUndo, canTankRedo, tankUndo, tankRedo, canRockUndo, canRockRedo, rockUndo, rockRedo, canCoralUndo, canCoralRedo, coralUndo, coralRedo, canEquipmentUndo, canEquipmentRedo, equipmentUndo, equipmentRedo])
 
   // Keyboard shortcuts
   useEffect(() => {

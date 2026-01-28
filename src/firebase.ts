@@ -10,6 +10,7 @@ const firebaseConfig = {
   storageBucket: "reefstruct.firebasestorage.app",
   messagingSenderId: "414172901451",
   appId: "1:414172901451:web:8daf29e6c528bdc2d19dce",
+  measurementId: "G-3TXC9FVW6Y"
 };
 
 // Initialize Firebase

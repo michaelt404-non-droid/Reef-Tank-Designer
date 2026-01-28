@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useTankStore } from './tankStore'
+import { createHistoryStore } from './historyStore'
 import { EQUIPMENT_INFO } from '../data/equipment'
 
 // Inline types to avoid Safari import issues
@@ -17,6 +18,14 @@ interface PlacedEquipment {
   visible: boolean // Can hide sump equipment
 }
 
+export interface EquipmentHistoryState {
+  equipment: PlacedEquipment[]
+}
+
+export const useEquipmentHistoryStore = createHistoryStore<EquipmentHistoryState>({
+  equipment: [],
+})
+
 interface EquipmentState {
   equipment: PlacedEquipment[]
   selectedEquipmentId: string | null
@@ -27,6 +36,10 @@ interface EquipmentState {
   selectEquipment: (id: string | null) => void
   toggleSumpVisibility: () => void
   clearAllEquipment: () => void
+  undo: () => void
+  redo: () => void
+  canUndo: boolean
+  canRedo: boolean
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
@@ -101,56 +114,97 @@ function getEquipmentPosition(
   }
 }
 
-export const useEquipmentStore = create<EquipmentState>((set) => ({
-  equipment: [],
-  selectedEquipmentId: null,
-  showSumpEquipment: false,
+export const useEquipmentStore = create<EquipmentState>((set, get) => {
+  // Subscribe to history changes to update canUndo/canRedo
+  useEquipmentHistoryStore.subscribe((historyState) => {
+    set({
+      canUndo: historyState.past.length > 0,
+      canRedo: historyState.future.length > 0,
+    })
+  })
 
-  addEquipment: (equipmentInfoId) => set((state) => {
-    const info = EQUIPMENT_INFO.find(e => e.id === equipmentInfoId)
-    if (!info) return state
+  return {
+    equipment: [],
+    selectedEquipmentId: null,
+    showSumpEquipment: false,
+    canUndo: false,
+    canRedo: false,
 
-    const tankDimensions = useTankStore.getState().dimensions
-    const scale = getEquipmentScale(tankDimensions)
-    const position = getEquipmentPosition(info, tankDimensions, scale)
+    addEquipment: (equipmentInfoId) => {
+      const info = EQUIPMENT_INFO.find(e => e.id === equipmentInfoId)
+      if (!info) return
 
-    // Rotation based on placement
-    let rotation: [number, number, number] = [0, 0, 0]
-    if (info.defaultPosition === 'side') {
-      rotation = [0, Math.PI / 2, 0] // Face inward
-    }
+      const tankDimensions = useTankStore.getState().dimensions
+      const scale = getEquipmentScale(tankDimensions)
+      const position = getEquipmentPosition(info, tankDimensions, scale)
 
-    const newEquipment: PlacedEquipment = {
-      id: generateId(),
-      equipmentInfoId: info.id,
-      type: info.type,
-      name: info.name,
-      position,
-      rotation,
-      scale,
-      color: info.color,
-      visible: info.placement !== 'external', // Hide sump equipment by default
-    }
+      let rotation: [number, number, number] = [0, 0, 0]
+      if (info.defaultPosition === 'side') {
+        rotation = [0, Math.PI / 2, 0]
+      }
 
-    return { equipment: [...state.equipment, newEquipment] }
-  }),
+      const newEquipment: PlacedEquipment = {
+        id: generateId(),
+        equipmentInfoId: info.id,
+        type: info.type,
+        name: info.name,
+        position,
+        rotation,
+        scale,
+        color: info.color,
+        visible: info.placement !== 'external',
+      }
 
-  removeEquipment: (id) => set((state) => ({
-    equipment: state.equipment.filter(e => e.id !== id),
-    selectedEquipmentId: state.selectedEquipmentId === id ? null : state.selectedEquipmentId,
-  })),
+      const updatedEquipment = [...get().equipment, newEquipment]
+      set({ equipment: updatedEquipment })
+      useEquipmentHistoryStore.getState().addState({ equipment: updatedEquipment })
+    },
 
-  updateEquipment: (id, updates) => set((state) => ({
-    equipment: state.equipment.map(e => e.id === id ? { ...e, ...updates } : e),
-  })),
+    removeEquipment: (id) => {
+      const updatedEquipment = get().equipment.filter(e => e.id !== id)
+      set({
+        equipment: updatedEquipment,
+        selectedEquipmentId: get().selectedEquipmentId === id ? null : get().selectedEquipmentId,
+      })
+      useEquipmentHistoryStore.getState().addState({ equipment: updatedEquipment })
+    },
 
-  selectEquipment: (id) => set({ selectedEquipmentId: id }),
+    updateEquipment: (id, updates) => {
+      const updatedEquipment = get().equipment.map(e => e.id === id ? { ...e, ...updates } : e)
+      set({ equipment: updatedEquipment })
+      useEquipmentHistoryStore.getState().addState({ equipment: updatedEquipment })
+    },
 
-  toggleSumpVisibility: () => set((state) => ({
-    showSumpEquipment: !state.showSumpEquipment,
-  })),
+    selectEquipment: (id) => set({ selectedEquipmentId: id }),
 
-  clearAllEquipment: () => set({ equipment: [], selectedEquipmentId: null }),
-}))
+    toggleSumpVisibility: () => set((state) => ({
+      showSumpEquipment: !state.showSumpEquipment,
+    })),
+
+    clearAllEquipment: () => {
+      set({ equipment: [], selectedEquipmentId: null })
+      useEquipmentHistoryStore.getState().addState({ equipment: [] })
+    },
+
+    undo: () => {
+      useEquipmentHistoryStore.getState().undo()
+      const historyPresent = useEquipmentHistoryStore.getState().present
+      if (historyPresent) {
+        set({ equipment: historyPresent.equipment })
+      }
+    },
+
+    redo: () => {
+      useEquipmentHistoryStore.getState().redo()
+      const historyPresent = useEquipmentHistoryStore.getState().present
+      if (historyPresent) {
+        set({ equipment: historyPresent.equipment })
+      }
+    },
+  }
+})
+
+// Initialize history store with initial equipment state
+useEquipmentHistoryStore.getState().clear({ equipment: useEquipmentStore.getState().equipment })
 
 export type { PlacedEquipment }

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { useTankStore } from './tankStore'
 import { useRockStore } from './rockStore'
 import { useLightStore } from './lightStore'
+import { createHistoryStore } from './historyStore'
 import { CORAL_INFO, CORAL_PAR_REQUIREMENTS } from '../data/corals'
 import { calculateTotalPAR } from '../utils/parCalculator'
 import { getRockBounds } from '../utils/rockBounds'
@@ -17,6 +18,14 @@ interface CoralInfo {
   baseColors: string[]
   modelPath: string
 }
+
+export interface CoralHistoryState {
+  corals: PlacedCoral[]
+}
+
+export const useCoralHistoryStore = createHistoryStore<CoralHistoryState>({
+  corals: [],
+})
 
 interface PlacedCoral {
   id: string
@@ -44,6 +53,10 @@ interface CoralState {
   clearAllCorals: () => void
   // Simulation methods
   tickCorals: (deltaSimHours: number, difficultyMod: number, minHealth: number, waterQuality: number) => void
+  undo: () => void
+  redo: () => void
+  canUndo: boolean
+  canRedo: boolean
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
@@ -232,221 +245,237 @@ function findValidRockPositions(
   return validPositions
 }
 
-export const useCoralStore = create<CoralState>((set) => ({
-  corals: [],
-  customCoralModels: [],
-  selectedCoralId: null,
+export const useCoralStore = create<CoralState>((set, get) => {
+  // Subscribe to history changes to update canUndo/canRedo
+  useCoralHistoryStore.subscribe((historyState) => {
+    set({
+      canUndo: historyState.past.length > 0,
+      canRedo: historyState.future.length > 0,
+    })
+  })
 
-  addCoral: (coralType) => set((state) => {
-    const coralInfo = [...CORAL_INFO, ...state.customCoralModels].find(c => c.id === coralType)
-    if (!coralInfo) return state
+  return {
+    corals: [],
+    customCoralModels: [],
+    selectedCoralId: null,
+    canUndo: false,
+    canRedo: false,
 
-    // Get rocks and lights for PAR-aware placement
-    const rocks = useRockStore.getState().rocks
-    const lights = useLightStore.getState().lights
+    addCoral: (coralType) => {
+      const coralInfo = [...CORAL_INFO, ...get().customCoralModels].find(c => c.id === coralType)
+      if (!coralInfo) return
 
-    // Get tank dimensions for fallback placement
-    const tankDimensions = useTankStore.getState().dimensions
-    const SCALE = 0.1
-    const tankHalfLength = (tankDimensions.length * SCALE) / 2
-    const tankHalfWidth = (tankDimensions.width * SCALE) / 2
+      const rocks = useRockStore.getState().rocks
+      const lights = useLightStore.getState().lights
 
-    // Calculate scale first (needed for collision detection)
-    const scale = coralInfo.baseScale * (0.8 + Math.random() * 0.4)
+      const tankDimensions = useTankStore.getState().dimensions
+      const SCALE = 0.1
+      const tankHalfLength = (tankDimensions.length * SCALE) / 2
+      const tankHalfWidth = (tankDimensions.width * SCALE) / 2
 
-    let position: [number, number, number] | null = null
+      const scale = coralInfo.baseScale * (0.8 + Math.random() * 0.4)
 
-    // Try to find a valid rock position with correct PAR and no collisions
-    const validPositions = findValidRockPositions(coralType, scale, rocks, lights, state.corals)
+      let position: [number, number, number] | null = null
 
-    if (validPositions.length > 0) {
-      // Pick from top positions (closest to optimal PAR) with some randomness
-      const topCount = Math.min(5, validPositions.length)
-      const selected = validPositions[Math.floor(Math.random() * topCount)]
-      position = selected.position
-    } else if (rocks.length > 0) {
-      // No valid PAR positions, try to find any non-colliding position on rocks
-      for (const rock of rocks) {
-        const bounds = getRockBounds(rock.type, rock.proceduralType, rock.scale)
+      const validPositions = findValidRockPositions(coralType, scale, rocks, lights, get().corals)
 
-        // Try multiple positions on this rock
-        for (let attempt = 0; attempt < 10; attempt++) {
-          const angle = Math.random() * Math.PI * 2
-          const radiusRatio = 0.5 + Math.random() * 0.5
+      if (validPositions.length > 0) {
+        const topCount = Math.min(5, validPositions.length)
+        const selected = validPositions[Math.floor(Math.random() * topCount)]
+        position = selected.position
+      } else if (rocks.length > 0) {
+        for (const rock of rocks) {
+          const bounds = getRockBounds(rock.type, rock.proceduralType, rock.scale)
+
+          for (let attempt = 0; attempt < 10; attempt++) {
+            const angle = Math.random() * Math.PI * 2
+            const radiusRatio = 0.5 + Math.random() * 0.5
+            const testPosition: [number, number, number] = [
+              rock.position[0] + Math.cos(angle) * bounds.halfX * radiusRatio,
+              rock.position[1] + bounds.halfY * (0.5 + Math.random() * 0.5),
+              rock.position[2] + Math.sin(angle) * bounds.halfZ * radiusRatio,
+            ]
+
+            if (!collidesWithCorals(testPosition, coralType, scale, get().corals)) {
+              position = testPosition
+              break
+            }
+          }
+
+          if (position) break
+        }
+
+        if (!position && get().corals.length > 0) {
+          const randomCoral = get().corals[Math.floor(Math.random() * get().corals.length)]
+          position = findNonCollidingPosition(
+            randomCoral.position,
+            coralType,
+            scale,
+            get().corals,
+            rocks
+          )
+        }
+      }
+
+      if (!position) {
+        const margin = 0.2
+        let attempts = 0
+        const maxAttempts = 30
+
+        while (attempts < maxAttempts) {
           const testPosition: [number, number, number] = [
-            rock.position[0] + Math.cos(angle) * bounds.halfX * radiusRatio,
-            rock.position[1] + bounds.halfY * (0.5 + Math.random() * 0.5),
-            rock.position[2] + Math.sin(angle) * bounds.halfZ * radiusRatio,
+            (Math.random() - 0.5) * (tankHalfLength * 2 - margin * 2),
+            0.15,
+            (Math.random() - 0.5) * (tankHalfWidth * 2 - margin * 2),
           ]
 
-          if (!collidesWithCorals(testPosition, coralType, scale, state.corals)) {
+          if (!collidesWithCorals(testPosition, coralType, scale, get().corals)) {
             position = testPosition
             break
           }
+
+          attempts++
         }
 
-        if (position) break
+        if (!position) {
+          position = [
+            (Math.random() - 0.5) * (tankHalfLength * 2 - margin * 2),
+            0.15,
+            (Math.random() - 0.5) * (tankHalfWidth * 2 - margin * 2),
+          ]
+        }
       }
 
-      // If still no position, try to find a non-colliding spot near existing coral
-      if (!position && state.corals.length > 0) {
-        const randomCoral = state.corals[Math.floor(Math.random() * state.corals.length)]
-        position = findNonCollidingPosition(
-          randomCoral.position,
-          coralType,
-          scale,
-          state.corals,
-          rocks
-        )
+      const color = coralInfo.baseColors[Math.floor(Math.random() * coralInfo.baseColors.length)]
+
+      const newCoral: PlacedCoral = {
+        id: generateId(),
+        coralType,
+        position: position!,
+        rotation: [0, Math.random() * Math.PI * 2, 0],
+        scale,
+        color,
+        health: 1.0,
+        growthProgress: 0,
+        colorIntensity: 1.0,
+        baseScale: scale,
       }
-    }
 
-    // Fallback to sand bed with collision detection
-    if (!position) {
-      const margin = 0.2
-      let attempts = 0
-      const maxAttempts = 30
+      const updatedCorals = [...get().corals, newCoral]
+      set({ corals: updatedCorals })
+      useCoralHistoryStore.getState().addState({ corals: updatedCorals })
+    },
 
-      while (attempts < maxAttempts) {
-        const testPosition: [number, number, number] = [
-          (Math.random() - 0.5) * (tankHalfLength * 2 - margin * 2),
-          0.15,
-          (Math.random() - 0.5) * (tankHalfWidth * 2 - margin * 2),
-        ]
+    addCustomCoralModel: (name, modelPath) => set((state) => {
+      const newModel: CoralInfo = {
+        id: `coral-model-${generateId()}`,
+        name,
+        description: 'Custom 3D model',
+        baseScale: 0.15,
+        baseColors: ['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4'],
+        modelPath,
+      }
+      return { customCoralModels: [...state.customCoralModels, newModel] }
+    }),
 
-        if (!collidesWithCorals(testPosition, coralType, scale, state.corals)) {
-          position = testPosition
-          break
+    removeCoral: (id) => {
+      const updatedCorals = get().corals.filter(c => c.id !== id)
+      set({
+        corals: updatedCorals,
+        selectedCoralId: get().selectedCoralId === id ? null : get().selectedCoralId,
+      })
+      useCoralHistoryStore.getState().addState({ corals: updatedCorals })
+    },
+
+    updateCoral: (id, updates) => {
+      const updatedCorals = get().corals.map(c => c.id === id ? { ...c, ...updates } : c)
+      set({ corals: updatedCorals })
+      useCoralHistoryStore.getState().addState({ corals: updatedCorals })
+    },
+
+    selectCoral: (id) => set({ selectedCoralId: id }),
+
+    clearAllCorals: () => {
+      set({ corals: [], selectedCoralId: null })
+      useCoralHistoryStore.getState().addState({ corals: [] })
+    },
+
+    undo: () => {
+      useCoralHistoryStore.getState().undo()
+      const historyPresent = useCoralHistoryStore.getState().present
+      if (historyPresent) {
+        set({ corals: historyPresent.corals })
+      }
+    },
+
+    redo: () => {
+      useCoralHistoryStore.getState().redo()
+      const historyPresent = useCoralHistoryStore.getState().present
+      if (historyPresent) {
+        set({ corals: historyPresent.corals })
+      }
+    },
+
+    // Simulation methods - DO NOT ADD TO HISTORY
+    tickCorals: (deltaSimHours, difficultyMod, minHealth, waterQuality) => set((state) => {
+      const lights = useLightStore.getState().lights
+
+      const updatedCorals = state.corals.map(coral => {
+        const par = calculateTotalPAR(lights, {
+          x: coral.position[0],
+          y: coral.position[1],
+          z: coral.position[2],
+        })
+
+        const parReq = CORAL_PAR_REQUIREMENTS[coral.coralType as CoralType] ?? { min: 50, optimal: 150, max: 300 }
+
+        let parFactor = 1.0
+        if (par < parReq.min) {
+          parFactor = Math.max(0.2, par / parReq.min)
+        } else if (par > parReq.max) {
+          parFactor = Math.max(0.3, 1 - (par - parReq.max) / parReq.max)
+        } else if (par >= parReq.optimal * 0.8 && par <= parReq.optimal * 1.2) {
+          parFactor = 1.2
         }
 
-        attempts++
-      }
+        const healthTarget = parFactor * waterQuality
+        const healthDelta = (healthTarget - coral.health) * 0.02 * deltaSimHours * difficultyMod
+        const newHealth = Math.max(minHealth, Math.min(1, coral.health + healthDelta))
 
-      // Last resort - just place it somewhere
-      if (!position) {
-        position = [
-          (Math.random() - 0.5) * (tankHalfLength * 2 - margin * 2),
-          0.15,
-          (Math.random() - 0.5) * (tankHalfWidth * 2 - margin * 2),
-        ]
-      }
-    }
+        let colorDelta = 0
+        if (newHealth < coral.colorIntensity) {
+          colorDelta = (newHealth - coral.colorIntensity) * 0.1 * deltaSimHours
+        } else {
+          colorDelta = (newHealth - coral.colorIntensity) * 0.02 * deltaSimHours / difficultyMod
+        }
+        const newColorIntensity = Math.max(0.1, Math.min(1, coral.colorIntensity + colorDelta))
 
-    // Random color from coral's palette
-    const color = coralInfo.baseColors[Math.floor(Math.random() * coralInfo.baseColors.length)]
+        let growthDelta = 0
+        if (newHealth > 0.7 && waterQuality > 0.6) {
+          const baseGrowthRate = coral.coralType === 'acropora' ? 0.001 :
+                                 coral.coralType === 'sps' ? 0.0015 :
+                                 coral.coralType === 'lps' ? 0.002 :
+                                 0.003
 
-    const newCoral: PlacedCoral = {
-      id: generateId(),
-      coralType,
-      position,
-      rotation: [0, Math.random() * Math.PI * 2, 0],
-      scale,
-      color,
-      // Initialize simulation properties
-      health: 1.0,           // Start healthy
-      growthProgress: 0,     // No growth yet
-      colorIntensity: 1.0,   // Full color
-      baseScale: scale,      // Remember original size
-    }
+          growthDelta = baseGrowthRate * parFactor * waterQuality * deltaSimHours / difficultyMod
+        }
+        const newGrowthProgress = Math.min(1, coral.growthProgress + growthDelta)
 
-    return { corals: [...state.corals, newCoral] }
-  }),
+        const growthScale = coral.baseScale * (1 + newGrowthProgress * 0.5)
 
-  addCustomCoralModel: (name, modelPath) => set((state) => {
-    const newModel: CoralInfo = {
-      id: `coral-model-${generateId()}`,
-      name,
-      description: 'Custom 3D model',
-      baseScale: 0.15,
-      baseColors: ['#ffffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4'],
-      modelPath,
-    }
-    return { customCoralModels: [...state.customCoralModels, newModel] }
-  }),
-
-  removeCoral: (id) => set((state) => ({
-    corals: state.corals.filter(c => c.id !== id),
-    selectedCoralId: state.selectedCoralId === id ? null : state.selectedCoralId,
-  })),
-
-  updateCoral: (id, updates) => set((state) => ({
-    corals: state.corals.map(c => c.id === id ? { ...c, ...updates } : c),
-  })),
-
-  selectCoral: (id) => set({ selectedCoralId: id }),
-
-  clearAllCorals: () => set({ corals: [], selectedCoralId: null }),
-
-  // Simulation methods
-  tickCorals: (deltaSimHours, difficultyMod, minHealth, waterQuality) => set((state) => {
-    const lights = useLightStore.getState().lights
-
-    const updatedCorals = state.corals.map(coral => {
-      // Calculate PAR at coral's position
-      const par = calculateTotalPAR(lights, {
-        x: coral.position[0],
-        y: coral.position[1],
-        z: coral.position[2],
+        return {
+          ...coral,
+          health: newHealth,
+          colorIntensity: newColorIntensity,
+          growthProgress: newGrowthProgress,
+          scale: growthScale,
+        }
       })
 
-      // Get PAR requirements for this coral type
-      const parReq = CORAL_PAR_REQUIREMENTS[coral.coralType as CoralType] ?? { min: 50, optimal: 150, max: 300 }
+      return { corals: updatedCorals }
+    }),
+  }
+})
 
-      // Calculate PAR factor (how well-suited the light is)
-      let parFactor = 1.0
-      if (par < parReq.min) {
-        // Too little light
-        parFactor = Math.max(0.2, par / parReq.min)
-      } else if (par > parReq.max) {
-        // Too much light (can cause bleaching)
-        parFactor = Math.max(0.3, 1 - (par - parReq.max) / parReq.max)
-      } else if (par >= parReq.optimal * 0.8 && par <= parReq.optimal * 1.2) {
-        // Optimal range - bonus
-        parFactor = 1.2
-      }
-
-      // Health changes based on PAR and water quality
-      const healthTarget = parFactor * waterQuality
-      const healthDelta = (healthTarget - coral.health) * 0.02 * deltaSimHours * difficultyMod
-      const newHealth = Math.max(minHealth, Math.min(1, coral.health + healthDelta))
-
-      // Color intensity follows health (bleaching when stressed)
-      // Color recovers slower than it fades
-      let colorDelta = 0
-      if (newHealth < coral.colorIntensity) {
-        // Bleaching - color fades relatively quickly
-        colorDelta = (newHealth - coral.colorIntensity) * 0.1 * deltaSimHours
-      } else {
-        // Recovery - color returns slowly
-        colorDelta = (newHealth - coral.colorIntensity) * 0.02 * deltaSimHours / difficultyMod
-      }
-      const newColorIntensity = Math.max(0.1, Math.min(1, coral.colorIntensity + colorDelta))
-
-      // Growth only happens when healthy and in good conditions
-      let growthDelta = 0
-      if (newHealth > 0.7 && waterQuality > 0.6) {
-        // Growth rate based on coral type (SPS/Acropora grow slower)
-        const baseGrowthRate = coral.coralType === 'acropora' ? 0.001 :
-                               coral.coralType === 'sps' ? 0.0015 :
-                               coral.coralType === 'lps' ? 0.002 :
-                               0.003 // Softies grow faster
-
-        growthDelta = baseGrowthRate * parFactor * waterQuality * deltaSimHours / difficultyMod
-      }
-      const newGrowthProgress = Math.min(1, coral.growthProgress + growthDelta)
-
-      // Scale increases with growth (up to 50% larger than base)
-      const growthScale = coral.baseScale * (1 + newGrowthProgress * 0.5)
-
-      return {
-        ...coral,
-        health: newHealth,
-        colorIntensity: newColorIntensity,
-        growthProgress: newGrowthProgress,
-        scale: growthScale,
-      }
-    })
-
-    return { corals: updatedCorals }
-  }),
-}))
+// Initialize history store with initial coral state
+useCoralHistoryStore.getState().clear({ corals: useCoralStore.getState().corals })

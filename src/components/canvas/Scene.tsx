@@ -27,7 +27,7 @@ import { ACESFilmicToneMapping } from 'three'
 // Convert inches to 3D units (1 inch = 0.1 units for nice scale)
 const SCALE = 0.1
 
-function SceneContent() {
+function SceneContent({ panTarget }: { panTarget: [number, number, number] }) {
   const selectRock = useRockStore((state) => state.selectRock)
   const selectCoral = useCoralStore((state) => state.selectCoral)
   const selectFish = useFishStore((state) => state.selectFish)
@@ -42,28 +42,6 @@ function SceneContent() {
     y: dimensions.height * SCALE,
     z: dimensions.width * SCALE,
   }), [dimensions])
-
-  // State for camera panning
-  const [panTarget, setPanTarget] = useState<[number, number, number]>([0, size.y / 2, 0])
-
-  // Update pan target's Y when tank height changes
-  useEffect(() => {
-    setPanTarget(prev => [prev[0], size.y / 2, prev[2]])
-  }, [size.y])
-
-  // Keyboard handler for panning
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.shiftKey) {
-      const panSpeed = 0.1
-      const maxPan = size.x / 2
-
-      if (event.key === 'ArrowLeft') {
-        setPanTarget(prev => [Math.max(-maxPan, prev[0] - panSpeed), prev[1], prev[2]])
-      } else if (event.key === 'ArrowRight') {
-        setPanTarget(prev => [Math.min(maxPan, prev[0] + panSpeed), prev[1], prev[2]])
-      }
-    }
-  }
 
   // Calculate initial camera position
   const maxDim = Math.max(size.x, size.y, size.z)
@@ -168,6 +146,28 @@ export function Scene() {
 
   const wrapperRef = useRef<HTMLDivElement>(null)
 
+  // State for camera panning
+  const [panTarget, setPanTarget] = useState<[number, number, number]>([0, size.y / 2, 0])
+
+  // Update pan target's Y when tank height changes
+  useEffect(() => {
+    setPanTarget(prev => [prev[0], size.y / 2, prev[2]])
+  }, [size.y])
+
+  // Keyboard handler for panning
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.shiftKey) {
+      const panSpeed = 0.1
+      const maxPan = size.x / 2
+
+      if (event.key === 'ArrowLeft') {
+        setPanTarget(prev => [Math.max(-maxPan, prev[0] - panSpeed), prev[1], prev[2]])
+      } else if (event.key === 'ArrowRight') {
+        setPanTarget(prev => [Math.min(maxPan, prev[0] + panSpeed), prev[1], prev[2]])
+      }
+    }
+  }
+
   useEffect(() => {
     // Focus the canvas wrapper on mount to receive key events
     wrapperRef.current?.focus()
@@ -190,7 +190,7 @@ export function Scene() {
           toneMappingExposure: 1.2,
         }}
       >
-        <SceneContent />
+        <SceneContent panTarget={panTarget} />
       </Canvas>
     </div>
   )

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useTankStore } from './tankStore'
+import { createHistoryStore } from './historyStore'
 import { getMaxScale, getRockBounds, getTankBounds, clampRockPosition } from '../utils/rockBounds'
 
 export type ProceduralRockType = 'boulder' | 'branch' | 'shelf' | 'pillar' | 'rubble' | 'cave' | 'arch'
@@ -13,6 +14,14 @@ export interface RockInfo {
   proceduralType?: ProceduralRockType
   modelPath?: string
 }
+
+export interface RockHistoryState {
+  rocks: PlacedRock[]
+}
+
+export const useRockHistoryStore = createHistoryStore<RockHistoryState>({
+  rocks: [],
+})
 
 // Built-in 3D model rocks
 export const BUILTIN_ROCKS: RockInfo[] = [
@@ -50,6 +59,10 @@ interface RockState {
   updateRock: (id: string, updates: Partial<PlacedRock>) => void
   selectRock: (id: string | null) => void
   clearAllRocks: () => void
+  undo: () => void
+  redo: () => void
+  canUndo: boolean
+  canRedo: boolean
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9)
@@ -64,73 +77,110 @@ const ROCK_COLORS = [
   '#8A8278',
 ]
 
-export const useRockStore = create<RockState>((set) => ({
-  rocks: [],
-  customRockModels: [],
-  selectedRockId: null,
+export const useRockStore = create<RockState>((set, get) => {
+  // Subscribe to history changes to update canUndo/canRedo
+  useRockHistoryStore.subscribe((historyState) => {
+    set({
+      canUndo: historyState.past.length > 0,
+      canRedo: historyState.future.length > 0,
+    })
+  })
 
-  addRock: (rockInfo) => set((state) => {
-    // Get tank dimensions to constrain rock placement
-    const tankDimensions = useTankStore.getState().dimensions
-    const tankBounds = getTankBounds(tankDimensions)
+  return {
+    rocks: [],
+    customRockModels: [],
+    selectedRockId: null,
+    canUndo: false,
+    canRedo: false,
 
-    // Calculate max scale for this rock type and clamp initial scale
-    const maxScale = getMaxScale(rockInfo.type, rockInfo.proceduralType, tankDimensions)
-    const baseScale = rockInfo.baseScale * (0.8 + Math.random() * 0.4)
-    const clampedScale = Math.min(baseScale, maxScale)
+    addRock: (rockInfo) => {
+      const tankDimensions = useTankStore.getState().dimensions
+      const tankBounds = getTankBounds(tankDimensions)
 
-    // Generate initial position within tank bounds
-    const rockBounds = getRockBounds(rockInfo.type, rockInfo.proceduralType, clampedScale)
-    const isModelRock = rockInfo.type === 'model'
-    const sandBedHeight = 0.12
+      const maxScale = getMaxScale(rockInfo.type, rockInfo.proceduralType, tankDimensions)
+      const baseScale = rockInfo.baseScale * (0.8 + Math.random() * 0.4)
+      const clampedScale = Math.min(baseScale, maxScale)
 
-    // For model rocks (GLB), origin is at bottom, so Y position IS the bottom
-    // For procedural rocks, origin is at center, so we need to add halfY
-    const initialY = isModelRock ? sandBedHeight : sandBedHeight + rockBounds.halfY
+      const rockBounds = getRockBounds(rockInfo.type, rockInfo.proceduralType, clampedScale)
+      const isModelRock = rockInfo.type === 'model'
+      const sandBedHeight = 0.12
 
-    const initialPosition: [number, number, number] = [
-      (Math.random() - 0.5) * (tankBounds.halfX * 2 - rockBounds.halfX * 2 - 0.2),
-      initialY,
-      (Math.random() - 0.5) * (tankBounds.halfZ * 2 - rockBounds.halfZ * 2 - 0.2),
-    ]
-    const clampedPosition = clampRockPosition(initialPosition, rockBounds, tankBounds, isModelRock)
+      const initialY = isModelRock ? sandBedHeight : sandBedHeight + rockBounds.halfY
 
-    const newRock: PlacedRock = {
-      id: generateId(),
-      rockInfoId: rockInfo.id,
-      type: rockInfo.type,
-      proceduralType: rockInfo.proceduralType,
-      modelPath: rockInfo.modelPath,
-      position: clampedPosition,
-      rotation: [0, Math.random() * Math.PI * 2, 0],
-      scale: clampedScale,
-      color: ROCK_COLORS[Math.floor(Math.random() * ROCK_COLORS.length)],
-    }
-    return { rocks: [...state.rocks, newRock] }
-  }),
+      const initialPosition: [number, number, number] = [
+        (Math.random() - 0.5) * (tankBounds.halfX * 2 - rockBounds.halfX * 2 - 0.2),
+        initialY,
+        (Math.random() - 0.5) * (tankBounds.halfZ * 2 - rockBounds.halfZ * 2 - 0.2),
+      ]
+      const clampedPosition = clampRockPosition(initialPosition, rockBounds, tankBounds, isModelRock)
 
-  addCustomModel: (name, modelPath) => set((state) => {
-    const newModel: RockInfo = {
-      id: `model-${generateId()}`,
-      name,
-      description: 'Custom 3D model',
-      baseScale: 0.5,
-      type: 'model',
-      modelPath,
-    }
-    return { customRockModels: [...state.customRockModels, newModel] }
-  }),
+      const newRock: PlacedRock = {
+        id: generateId(),
+        rockInfoId: rockInfo.id,
+        type: rockInfo.type,
+        proceduralType: rockInfo.proceduralType,
+        modelPath: rockInfo.modelPath,
+        position: clampedPosition,
+        rotation: [0, Math.random() * Math.PI * 2, 0],
+        scale: clampedScale,
+        color: ROCK_COLORS[Math.floor(Math.random() * ROCK_COLORS.length)],
+      }
+      const updatedRocks = [...get().rocks, newRock]
+      set({ rocks: updatedRocks })
+      useRockHistoryStore.getState().addState({ rocks: updatedRocks })
+    },
 
-  removeRock: (id) => set((state) => ({
-    rocks: state.rocks.filter(r => r.id !== id),
-    selectedRockId: state.selectedRockId === id ? null : state.selectedRockId,
-  })),
+    addCustomModel: (name, modelPath) => set((state) => {
+      const newModel: RockInfo = {
+        id: `model-${generateId()}`,
+        name,
+        description: 'Custom 3D model',
+        baseScale: 0.5,
+        type: 'model',
+        modelPath,
+      }
+      return { customRockModels: [...state.customRockModels, newModel] }
+    }),
 
-  updateRock: (id, updates) => set((state) => ({
-    rocks: state.rocks.map(r => r.id === id ? { ...r, ...updates } : r),
-  })),
+    removeRock: (id) => {
+      const updatedRocks = get().rocks.filter(r => r.id !== id)
+      set({
+        rocks: updatedRocks,
+        selectedRockId: get().selectedRockId === id ? null : get().selectedRockId,
+      })
+      useRockHistoryStore.getState().addState({ rocks: updatedRocks })
+    },
 
-  selectRock: (id) => set({ selectedRockId: id }),
+    updateRock: (id, updates) => {
+      const updatedRocks = get().rocks.map(r => r.id === id ? { ...r, ...updates } : r)
+      set({ rocks: updatedRocks })
+      useRockHistoryStore.getState().addState({ rocks: updatedRocks })
+    },
 
-  clearAllRocks: () => set({ rocks: [], selectedRockId: null }),
-}))
+    selectRock: (id) => set({ selectedRockId: id }),
+
+    clearAllRocks: () => {
+      set({ rocks: [], selectedRockId: null })
+      useRockHistoryStore.getState().addState({ rocks: [] })
+    },
+
+    undo: () => {
+      useRockHistoryStore.getState().undo()
+      const historyPresent = useRockHistoryStore.getState().present
+      if (historyPresent) {
+        set({ rocks: historyPresent.rocks })
+      }
+    },
+
+    redo: () => {
+      useRockHistoryStore.getState().redo()
+      const historyPresent = useRockHistoryStore.getState().present
+      if (historyPresent) {
+        set({ rocks: historyPresent.rocks })
+      }
+    },
+  }
+})
+
+// Initialize history store with initial rock state
+useRockHistoryStore.getState().clear({ rocks: useRockStore.getState().rocks })
